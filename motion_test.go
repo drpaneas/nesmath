@@ -172,9 +172,9 @@ func TestHorizontalMotion_Step_NegativeSpeed(t *testing.T) {
 // TestVerticalMotion_Step_SpeedIsNeverNybbleSplit is a regression guard
 // for the bug this type was rewritten to fix: an earlier implementation
 // treated vertical Speed as a [Q4_4] and nybble-split it exactly like
-// [HorizontalMotion] does. It is not - ImposeGravity (SMBDIS.ASM:7704)
-// adds Speed to Position as a raw signed whole byte, with no split at
-// all (see NES_MATH_FOR_PORTERS.md's "Vertical speed is not 4.4").
+// [HorizontalMotion] does. It is not - a typical gravity routine adds
+// Speed to Position as a raw signed whole byte, with no split at all
+// (see NES_MATH_FOR_PORTERS.md's "Vertical speed is not 4.4").
 //
 // Speed=0xFC (-4) is the specific value that exposes the bug most
 // clearly: nybble-split as a Q4_4, 0xFC produces whole=-1 (see
@@ -218,8 +218,8 @@ func TestVerticalMotion_Step_GravityTrace(t *testing.T) {
 }
 
 // TestVerticalMotion_Step_Clamp verifies the clamp fires only once BOTH
-// conditions from SMBDIS.ASM:7727-7735 are true: Speed has reached/passed
-// maxSpeed, AND MoveForce's fractional half has also reached 0x80.
+// conditions are true: Speed has reached/passed maxSpeed, AND MoveForce's
+// fractional half has also reached 0x80.
 // MoveForce=0xFF plus force=0x81 overflows to exactly 0x80 (>=0x80), so
 // the clamp fires this frame.
 func TestVerticalMotion_Step_Clamp(t *testing.T) {
@@ -280,8 +280,8 @@ func TestVerticalMotion_Step_DummyUsesOldMoveForce(t *testing.T) {
 }
 
 // TestVerticalMotion_Step_UpwardForce exercises the optional SBC-based
-// deceleration path (SMBDIS.ASM:7736-7758): subtracting more than
-// MoveForce currently holds produces a borrow that decrements Speed.
+// deceleration path: subtracting more than MoveForce currently holds
+// produces a borrow that decrements Speed.
 func TestVerticalMotion_Step_UpwardForce(t *testing.T) {
 	v := VerticalMotion{Speed: 0, MoveForce: 0x05}
 
@@ -298,8 +298,8 @@ func TestVerticalMotion_Step_UpwardForce(t *testing.T) {
 // TestVerticalMotion_Step_UpwardForceClamp mirrors
 // TestVerticalMotion_Step_Clamp for the upward direction: the clamp only
 // fires once Speed has passed the negated maxSpeed AND MoveForce's
-// fractional half has dropped below 0x80 (SMBDIS.ASM:7750-7758), the
-// mirror image of the downward clamp's ">=0x80" condition.
+// fractional half has dropped below 0x80, the mirror image of the
+// downward clamp's ">=0x80" condition.
 func TestVerticalMotion_Step_UpwardForceClamp(t *testing.T) {
 	v := VerticalMotion{Speed: -4, MoveForce: 0x05}
 

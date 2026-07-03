@@ -115,9 +115,9 @@ func runNegate(_ js.Value, args []js.Value) any {
 }
 
 // runSimpleMovement drives Position16.AddSigned directly with a raw
-// signed velocity and no accumulator at all - the "Beyond Super Mario
-// Bros." pattern from doc.go, for games that don't need SMB's specific
-// sub-pixel scheme.
+// signed velocity and no accumulator at all - the "Beyond a single
+// game's design" pattern from doc.go, for games that don't need the
+// full nybble-split sub-pixel scheme.
 func runSimpleMovement(_ js.Value, args []js.Value) any {
 	velocity := int8(args[0].Int())
 	startPage := uint8(args[1].Int())
@@ -216,8 +216,8 @@ func runHorizontalTrace(_ js.Value, args []js.Value) any {
 // fixed gravity force, returning per-frame speed/position/accumulator
 // state so the frontend can plot a jump arc and mark its peak (the frame
 // where Speed crosses from negative to non-negative). upForce is the
-// optional mirrored upward-deceleration force (SMBDIS.ASM:7736-7758);
-// pass 0 to skip that section entirely, matching the player.
+// optional mirrored upward-deceleration force; pass 0 to skip that
+// section entirely, matching the player.
 func runVerticalTrace(_ js.Value, args []js.Value) any {
 	initialSpeed := int8(args[0].Int())
 	force := uint8(args[1].Int())

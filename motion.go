@@ -6,18 +6,18 @@ package nesmath
 // overflows, and the resulting carry - combined with the whole-pixel
 // delta - is folded into Position.
 //
-// Field names describe roles; the SMBDIS.ASM addresses they replace are
-// noted for cross-referencing against the disassembly.
+// Field names describe roles rather than any one disassembly's original
+// variable names.
 type HorizontalMotion struct {
 	Position  Position16
-	MoveForce Accumulator8 // SMB: SprObject_X_MoveForce ($0400+x)
-	Speed     Q4_4         // SMB: SprObject_X_Speed ($0057+x)
+	MoveForce Accumulator8 // horizontal sub-pixel accumulator
+	Speed     Q4_4         // horizontal speed byte
 }
 
 // Step executes one frame of horizontal movement and returns the net
 // number of whole pixels the object moved this frame.
 //
-// It mirrors MoveObjectHorizontally (SMBDIS.ASM:7541 onward) exactly as a
+// It mirrors a typical horizontal-movement routine exactly as a
 // two-stage carry pipeline:
 //
 //	frac's carry into pixel  := MoveForce.Add(frac)
@@ -34,8 +34,9 @@ func (h *HorizontalMotion) Step() int8 {
 	return int8(uint8(whole) + uint8(carry))
 }
 
-// VerticalMotion is the carry structure SMB uses for gravity. Unlike
-// [HorizontalMotion], vertical speed is never nybble-split - Speed is a
+// VerticalMotion is the carry structure a typical NES platformer uses
+// for gravity. Unlike [HorizontalMotion], vertical speed is never
+// nybble-split - Speed is a
 // raw signed whole-pixel value, added directly to Position. Sub-pixel
 // precision instead comes from two accumulators that share a byte across
 // two different points in its lifecycle each frame:
@@ -49,20 +50,20 @@ func (h *HorizontalMotion) Step() int8 {
 //     smooths motion between the (comparatively rare) frames where Speed
 //     itself changes.
 //
-// Field names describe roles; the SMBDIS.ASM addresses they replace are
-// noted for cross-referencing against the disassembly.
+// Field names describe roles rather than any one disassembly's original
+// variable names.
 type VerticalMotion struct {
 	Position  Position16
-	MoveForce Accumulator8 // SMB: SprObject_Y_MoveForce ($0433+x)
-	Dummy     Accumulator8 // SMB: SprObject_YMF_Dummy ($0416+x)
-	Speed     int8         // SMB: SprObject_Y_Speed ($009F+x) - raw signed byte, NOT Q4_4
-	HighPos   uint8        // SMB: SprObject_Y_HighPos - off-screen detection
+	MoveForce Accumulator8 // vertical force accumulator
+	Dummy     Accumulator8 // delayed copy of MoveForce, for the position chain
+	Speed     int8         // raw signed byte, NOT Q4_4
+	HighPos   uint8        // off-screen detection
 }
 
 // Step executes one frame of vertical movement and returns the net number
-// of whole pixels the object moved this frame. It mirrors ImposeGravity
-// (SMBDIS.ASM:7704-7759) exactly, including the order of operations,
-// which matters: the 6502's carry flag survives silently across the LDY,
+// of whole pixels the object moved this frame. It mirrors a typical
+// gravity routine exactly, including the order of operations, which
+// matters: the 6502's carry flag survives silently across the LDY,
 // LDA, BPL, and DEY/STY instructions between the Dummy update and the
 // Position update, so the carry consumed by Position's addition is the
 // one produced by Dummy accumulating MoveForce's OLD (pre-update) value -
@@ -70,20 +71,19 @@ type VerticalMotion struct {
 // motion.
 //
 // force is the gravity/force value to accumulate into MoveForce this
-// frame (e.g. VerticalForce for the player, or a table-driven per-object
+// frame (e.g. a constant for the player, or a table-driven per-object
 // value for enemies - the specific values are game data supplied by the
 // caller, not part of this package). maxSpeed caps the downward speed;
 // the clamp only fires once MoveForce's fractional half has also reached
-// 0x80 (SMBDIS.ASM:7727-7735), a deliberate rounding behavior that avoids
-// clamping one frame earlier than the ROM would - not a simplification of
-// it.
+// 0x80, a deliberate rounding behavior that avoids clamping one frame
+// earlier than the ROM would - not a simplification of it.
 //
 // upForce is the optional simultaneous upward-deceleration force used by
-// a few objects that need two-directional gravity in one call (e.g. Red
-// Koopa Paratroopa, moving platforms) - never by the player, whose
+// a few objects that need two-directional gravity in one call (e.g. a
+// bouncing enemy, moving platforms) - never by the player, whose
 // ascent/descent force switching is handled by the caller choosing which
 // force value to pass, not by this built-in mechanism. Passing upForce=0
-// skips this section entirely (SMBDIS.ASM:7736-7758).
+// skips this section entirely.
 func (v *VerticalMotion) Step(force uint8, maxSpeed int8, upForce uint8) int8 {
 	carryA := v.Dummy.Add(v.MoveForce.Value())
 

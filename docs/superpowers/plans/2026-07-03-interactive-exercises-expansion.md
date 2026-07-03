@@ -108,9 +108,9 @@ func runNegate(_ js.Value, args []js.Value) any {
 }
 
 // runSimpleMovement drives Position16.AddSigned directly with a raw
-// signed velocity and no accumulator at all - the "Beyond Super Mario
-// Bros." pattern from doc.go, for games that don't need SMB's specific
-// sub-pixel scheme.
+// signed velocity and no accumulator at all - the "Beyond a single
+// game's design" pattern from doc.go, for games that don't need the
+// full nybble-split sub-pixel scheme.
 func runSimpleMovement(_ js.Value, args []js.Value) any {
 	velocity := int8(args[0].Int())
 	startPage := uint8(args[1].Int())
@@ -186,7 +186,7 @@ Neither the existing `exercise-adc` nor `exercise-split` sections are deleted or
       <div class="bit-grid" id="negate-grid"></div>
       <p id="negate-result" class="result-line">&nbsp;</p>
     </div>
-    <p class="hint">40 (0x28) is Mario's max run speed, +2.5 px/frame. Negate it and get 0xD8, -2.5 px/frame (running left). Then try 128 (0x80) for the wrap-to-itself edge case.</p>
+    <p class="hint">40 (0x28) is a typical max run speed, +2.5 px/frame. Negate it and get 0xD8, -2.5 px/frame (running left). Then try 128 (0x80) for the wrap-to-itself edge case.</p>
   </section>
 ```
 
@@ -197,7 +197,7 @@ Then insert the new Position16 section immediately after the (now-numbered-6) ac
 ```html
   <section class="exercise" id="exercise-simple-movement">
     <h2>7. Position16 alone: movement without Q4_4</h2>
-    <p>Not every NES game needs Super Mario Bros.' specific sub-pixel scheme. Some objects - a bullet, a simple enemy drifting one direction - just move a fixed whole number of pixels every frame, with carryIn always 0 and no accumulator feeding it. This is <code>Position16.AddSigned</code> used completely on its own.</p>
+    <p>Not every NES game needs a specific sub-pixel scheme like the one above. Some objects - a bullet, a simple enemy drifting one direction - just move a fixed whole number of pixels every frame, with carryIn always 0 and no accumulator feeding it. This is <code>Position16.AddSigned</code> used completely on its own.</p>
     <div class="controls">
       <label>velocity (px/frame) <input type="number" id="simple-velocity" min="-128" max="127" value="4"></label>
       <label>start pixel <input type="number" id="simple-pixel" min="0" max="255" value="250"></label>
@@ -357,7 +357,7 @@ Replace the entire `<section class="exercise" id="exercise-horizontal">` block w
 ```html
   <section class="exercise" id="exercise-horizontal">
     <h2>8. Horizontal motion: speed becomes movement</h2>
-    <p>Combine a Q4_4 speed with the sub-pixel accumulator and a page/pixel position, and you get SMB's actual per-frame movement routine. The dot below is the object; the vertical line marks a page boundary (pixel 255 to 0).</p>
+    <p>Combine a Q4_4 speed with the sub-pixel accumulator and a page/pixel position, and you get the per-frame movement routine used by a typical NES platformer. The dot below is the object; the vertical line marks a page boundary (pixel 255 to 0).</p>
     <div class="controls">
       <label>speed byte (hex) <input type="text" id="h-speed" value="19" maxlength="2"></label>
       <label>start pixel <input type="number" id="h-pixel" min="0" max="255" value="240"></label>
@@ -515,8 +515,8 @@ Replace the entire `runVerticalTrace` function with:
 // fixed gravity force, returning per-frame speed/position/accumulator
 // state so the frontend can plot a jump arc and mark its peak (the frame
 // where Speed crosses from negative to non-negative). upForce is the
-// optional mirrored upward-deceleration force (SMBDIS.ASM:7736-7758);
-// pass 0 to skip that section entirely, matching the player.
+// optional mirrored upward-deceleration force; pass 0 to skip that
+// section entirely, matching the player.
 func runVerticalTrace(_ js.Value, args []js.Value) any {
 	initialSpeed := int8(args[0].Int())
 	force := uint8(args[1].Int())
@@ -570,7 +570,7 @@ Replace the entire `<section class="exercise" id="exercise-vertical">` block wit
       <canvas id="v-canvas" width="640" height="220"></canvas>
       <p id="v-result" class="result-line">&nbsp;</p>
     </div>
-    <p class="hint">Watch for the frame where Speed crosses from negative to non-negative - that is the peak of the jump. Set upward force > 0 to see the optional mirrored deceleration path (used by e.g. Red Koopa Paratroopa, never by the player).</p>
+    <p class="hint">Watch for the frame where Speed crosses from negative to non-negative - that is the peak of the jump. Set upward force > 0 to see the optional mirrored deceleration path (used by e.g. a bouncing enemy, never by the player).</p>
   </section>
 ```
 
@@ -664,7 +664,7 @@ Insert this new section immediately before the closing `</main>` tag (after the 
       <canvas id="capstone-canvas" width="640" height="260"></canvas>
       <p id="capstone-result" class="result-line">&nbsp;</p>
     </div>
-    <p class="hint">This is the shape of a Mario jump: rising, arcing over, falling - produced entirely by integer carry chains, no floating point anywhere.</p>
+    <p class="hint">This is the shape of a classic platformer jump: rising, arcing over, falling - produced entirely by integer carry chains, no floating point anywhere.</p>
   </section>
 ```
 

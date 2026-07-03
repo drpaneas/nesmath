@@ -1,7 +1,7 @@
 // Package nesmath models the arithmetic architecture of the Ricoh 2A03
-// (the NES's 6502-derived CPU), as used by Super Mario Bros. and games like
-// it, for the purpose of porting NES physics to modern languages with
-// bit-exact accuracy.
+// (the NES's 6502-derived CPU), as used by classic NES platformers, for
+// the purpose of porting NES physics to modern languages with bit-exact
+// accuracy.
 //
 // # This is not a fixed-point number library
 //
@@ -17,13 +17,13 @@
 //
 //	Force -> carry -> Speed -> carry -> SubPixel -> carry -> Pixel -> carry -> Page
 //
-// Most of those bytes are not numbers. A sub-pixel accumulator such as
-// SMB's X_MoveForce is not "the fractional part of position" - it is a
-// delay counter that accumulates fractional crumbs each frame until it
-// overflows, at which point the carry promotes one whole pixel of motion
-// into the position byte. nesmath models that role directly with
-// [Accumulator8], distinct from [Q4_4], the one type in this package that
-// does have a meaningful decimal interpretation.
+// Most of those bytes are not numbers. A sub-pixel accumulator such as a
+// horizontal move-force byte is not "the fractional part of position" -
+// it is a delay counter that accumulates fractional crumbs each frame
+// until it overflows, at which point the carry promotes one whole pixel
+// of motion into the position byte. nesmath models that role directly
+// with [Accumulator8], distinct from [Q4_4], the one type in this
+// package that does have a meaningful decimal interpretation.
 //
 // # Design principle
 //
@@ -40,24 +40,26 @@
 //
 // # Ground truth
 //
-// Every type and method in this package documents the SMBDIS.ASM routine
-// it mirrors. The full conceptual background - why fixed-point instead of
-// float, the history of the 4.4 and 8.8 formats, and a worked frame-by-frame
-// trace of the carry chain - is in [NES_MATH_FOR_PORTERS.md] in this repo.
+// Every type and method in this package documents the assembly routine
+// it mirrors, using names chosen to describe hardware roles rather than
+// any one disassembly's original internal labels. The full conceptual
+// background - why fixed-point instead of float, the history of the 4.4
+// and 8.8 formats, and a worked frame-by-frame trace of the carry chain -
+// is in [NES_MATH_FOR_PORTERS.md] in this repo.
 //
 // # What this package does not do
 //
 // It does not provide friction tables, jump-force tables, or speed tiers -
 // those are game data that belongs in a port, not in this library. It does
 // not convert from float64, because the NES works in bytes, not decimals.
-// It does not multiply or divide, because SMB does not either. It has no
-// String method that prints "1.5625" - the decimal interpretation is a
-// human convenience, not something the game computes.
+// It does not multiply or divide, because NES platformers generally do
+// not either. It has no String method that prints "1.5625" - the decimal
+// interpretation is a human convenience, not something the game computes.
 //
-// # Beyond Super Mario Bros.
+// # Beyond a single game's design
 //
-// SMB's specific arithmetic - a nybble-split [Q4_4] speed feeding a
-// separate [Accumulator8] sub-pixel byte - is one real NES game's design
+// The arithmetic modeled here - a nybble-split [Q4_4] speed feeding a
+// separate [Accumulator8] sub-pixel byte - is one NES game design
 // choice, not the NES's only design choice. Plenty of NES games use
 // simpler schemes:
 //
@@ -74,19 +76,19 @@
 //     and no accumulator feeding it.
 //
 // nesmath's layered primitives are built to support both without forcing
-// SMB's three-tier structure onto a simpler game: [ADC], [SBC], and
+// a three-tier structure onto a simpler game: [ADC], [SBC], and
 // [Position16] work standalone, and [Q4_4]/[Accumulator8] are opt-in for
-// games (or objects within a game) that actually need SMB-style
+// games (or objects within a game) that actually need this style of
 // sub-pixel precision.
 //
 // # Validation
 //
 // Every function is tested against hand-verified fixtures traceable to
-// SMBDIS.ASM (see the test files in this package). A further validation
-// step - replaying real ROM traces captured via an emulator and comparing
-// them frame-for-frame against this package - is a natural extension for
-// callers building a full port, but is intentionally left out of this
-// package to keep it dependency-free.
+// real 6502 assembly patterns (see the test files in this package). A
+// further validation step - replaying real ROM traces captured via an
+// emulator and comparing them frame-for-frame against this package - is a
+// natural extension for callers building a full port, but is
+// intentionally left out of this package to keep it dependency-free.
 //
 // [NES_MATH_FOR_PORTERS.md]: https://github.com/drpaneas/nesmath/blob/main/NES_MATH_FOR_PORTERS.md
 package nesmath

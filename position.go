@@ -2,9 +2,10 @@ package nesmath
 
 // Position16 is a page-and-pixel coordinate, not a 16-bit integer.
 //
-// SMB tracks on-screen position as two separate bytes: a page (which
-// 256-pixel-wide screen the object is on) and a pixel (the position
-// within that screen). Modeling them as a struct rather than a single
+// NES platformers commonly track on-screen position as two separate
+// bytes: a page (which 256-pixel-wide screen the object is on) and a
+// pixel (the position within that screen). Modeling them as a struct
+// rather than a single
 // uint16 keeps the type honest about the fact that the game reads and
 // compares these bytes independently in most of its code - collision
 // checks and rendering read Pixel alone, and only camera/scroll logic
@@ -32,9 +33,9 @@ type Position16 struct {
 //	adc Page
 //	sta Page
 //
-// This is exactly the pattern MoveObjectHorizontally and
-// MovePlayerVertically use to fold a whole-pixel movement (already
-// extracted from a [Q4_4] via [Q4_4.Split]) into the page/pixel pair,
+// This is exactly the pattern typical horizontal- and vertical-movement
+// routines use to fold a whole-pixel movement (already extracted from a
+// [Q4_4] via [Q4_4.Split]) into the page/pixel pair,
 // including the case where whole is negative: the sign-extension byte
 // (0xFF, i.e. -1) at the page level exactly cancels a false carry
 // produced when a small negative delta does not actually cross a page
@@ -57,9 +58,9 @@ func (p *Position16) AddSigned(whole int8, carryIn Carry) Carry {
 
 // World returns the position collapsed into a single 16-bit value,
 // Page*256 + Pixel. This is a convenience for distance and ordering
-// comparisons across page boundaries; it is not how SMB itself stores or
-// compares position, which is why it is a derived method rather than the
-// underlying representation.
+// comparisons across page boundaries; it is not how a typical NES
+// platformer itself stores or compares position, which is why it is a
+// derived method rather than the underlying representation.
 func (p Position16) World() uint16 {
 	return uint16(p.Page)*256 + uint16(p.Pixel)
 }

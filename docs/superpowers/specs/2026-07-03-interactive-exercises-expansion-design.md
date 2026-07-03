@@ -48,7 +48,7 @@ One byte input. Shows the bit-flip (one's complement) as an intermediate step, t
 
 ### 7. Standalone `Position16` movement *(new)*
 
-Directly demonstrates `doc.go`'s "Beyond Super Mario Bros." section: no `Q4_4`, no `Accumulator8` - just a raw signed velocity byte added to a `Position16` every frame via `AddSigned`. Same canvas style as the existing horizontal-motion track. The point is showing the primitives work standalone for games/objects that don't need SMB's specific sub-pixel scheme.
+Directly demonstrates `doc.go`'s "Beyond a single game's design" section: no `Q4_4`, no `Accumulator8` - just a raw signed velocity byte added to a `Position16` every frame via `AddSigned`. Same canvas style as the existing horizontal-motion track. The point is showing the primitives work standalone for games/objects that don't need this specific sub-pixel scheme.
 
 **WASM export:** `runSimpleMovement(velocity int8, startPage, startPixel uint8, frameCount int) -> []{frame, page, pixel}`.
 

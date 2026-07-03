@@ -2,10 +2,11 @@ package nesmath
 
 // Accumulator8 is a carry-producing residue bucket, not a number.
 //
-// It models bytes like SprObject_X_MoveForce, SprObject_Y_MoveForce, and
-// SprObject_YMF_Dummy: memory locations that exist only to accumulate a
-// fractional amount each frame and occasionally overflow, promoting one
-// unit into the next tier of a carry chain (see [ADC]). Reading the
+// It models bytes like a horizontal move-force accumulator, a vertical
+// force accumulator, and its delayed copy: memory locations that exist
+// only to accumulate a fractional amount each frame and occasionally
+// overflow, promoting one unit into the next tier of a carry chain (see
+// [ADC]). Reading the
 // "value" of an Accumulator8 outside of that overflow is meaningless -
 // there is no whole number or fraction it represents on its own, which is
 // why this type deliberately has no Split, Integer, or Fraction methods.
@@ -45,9 +46,9 @@ func (a *Accumulator8) Add(value uint8) Carry {
 //	sec
 //	sbc value
 //
-// which ImposeGravity uses for the optional upward-deceleration path
-// (SMBDIS.ASM:7743-7746), undoing part of a previous [Add] to produce a
-// second, opposite-direction carry chain from the same byte.
+// which a gravity routine uses for the optional upward-deceleration
+// path, undoing part of a previous [Add] to produce a second,
+// opposite-direction carry chain from the same byte.
 func (a *Accumulator8) Sub(value uint8) Carry {
 	raw := uint8(*a)
 	carry := SBC(&raw, value, 1)

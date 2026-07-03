@@ -10,7 +10,7 @@
 
 <header>
   <h1>nesmath</h1>
-  <p class="tagline">The 6502 carry-chain architecture behind Super Mario Bros, running live in your browser via WebAssembly.</p>
+  <p class="tagline">The 6502 carry-chain architecture behind classic NES platformer physics, running live in your browser via WebAssembly.</p>
   <p class="links">
     <a href="https://github.com/drpaneas/nesmath" target="_blank" rel="noopener">GitHub</a>
     <span aria-hidden="true">&middot;</span>
@@ -25,13 +25,13 @@
 
   <section class="prose" id="sec-1">
     <h2>1. Why This Article Exists</h2>
-    <p>You are porting Super Mario Bros. to a modern platform. You have access to the full disassembly (SMBDIS.ASM), you know the physics constants, and you can read the wiki pages describing every system. What you may not have is an intuition for <em>why</em> the numbers look the way they do - why Mario's run speed is <code>$19</code> and not <code>$1A</code>, why friction values live in a three-entry table, why gravity uses two bytes when speed uses one.</p>
-    <p>This article builds that intuition. It starts with the hardware constraint (what the 6502 CPU can and cannot do), traces the design decisions that follow from that constraint, and ends with concrete advice for reproducing NES-accurate behavior in Go, Rust, C, or any language with integer types. Every concept is grounded in real code from SMBDIS.ASM. Wherever you see a "Try it" box, it is running the real <a href="https://github.com/drpaneas/nesmath" target="_blank" rel="noopener">nesmath</a> Go library compiled to WebAssembly - nothing here is a JavaScript reimplementation.</p>
+    <p>You are porting a classic single-screen NES platformer to a modern platform. You have access to a full disassembly of the original ROM, you know the physics constants, and you can read wiki pages describing every system. What you may not have is an intuition for <em>why</em> the numbers look the way they do - why a run speed byte is <code>$19</code> and not <code>$1A</code>, why friction values live in a three-entry table, why gravity uses two bytes when speed uses one.</p>
+    <p>This article builds that intuition. It starts with the hardware constraint (what the 6502 CPU can and cannot do), traces the design decisions that follow from that constraint, and ends with concrete advice for reproducing NES-accurate behavior in Go, Rust, C, or any language with integer types. Every concept is grounded in real assembly patterns used throughout the NES library's back catalog, using descriptive names for routines and variables rather than any one game's original internal labels. Wherever you see a "Try it" box, it is running the real <a href="https://github.com/drpaneas/nesmath" target="_blank" rel="noopener">nesmath</a> Go library compiled to WebAssembly - nothing here is a JavaScript reimplementation.</p>
     <h3>Three levels of fixed-point - and why existing libraries won't help</h3>
     <p>If you search for "fixed-point library" in any language, you will find dozens. None of them solve the problem you actually have. The reason is that fixed-point means different things at different levels:</p>
-    <p><strong>Level 1: Numeric type.</strong> This is what libraries provide. A type like <code>Q16.16</code> that wraps an <code>int32</code> and gives you <code>+</code>, <code>-</code>, <code>*</code>, <code>/</code> with a fixed decimal point. Useful for finance, DSP, physics engines. Not useful for porting SMB, because SMB does not think of its values as "numbers with a decimal point."</p>
+    <p><strong>Level 1: Numeric type.</strong> This is what libraries provide. A type like <code>Q16.16</code> that wraps an <code>int32</code> and gives you <code>+</code>, <code>-</code>, <code>*</code>, <code>/</code> with a fixed decimal point. Useful for finance, DSP, physics engines. Not useful for porting an NES platformer, because the original game does not think of its values as "numbers with a decimal point."</p>
     <p><strong>Level 2: Retro fixed-point.</strong> A <code>Q4_4</code> type backed by <code>uint8</code>, with operations like <code>Split()</code>, <code>Integer()</code>, <code>Fraction()</code>, <code>SignExtendedInteger()</code>. This maps the byte layout of NES speed values. Closer, but still not enough.</p>
-    <p><strong>Level 3: Hardware arithmetic model.</strong> This is what SMB actually uses. There is no "fixed-point number" in the codebase. There are independent bytes - a force byte, a speed byte, a sub-pixel accumulator, a pixel position, a page counter - connected by <strong>carry propagation</strong>. The carry chain is not a numeric operation. It is an algorithm:</p>
+    <p><strong>Level 3: Hardware arithmetic model.</strong> This is what an NES platformer actually uses. There is no "fixed-point number" in the codebase. There are independent bytes - a force byte, a speed byte, a sub-pixel accumulator, a pixel position, a page counter - connected by <strong>carry propagation</strong>. The carry chain is not a numeric operation. It is an algorithm:</p>
     <pre><code>Force
   &darr; carry
 Speed
@@ -48,7 +48,7 @@ Page</code></pre>
   <section class="prose" id="sec-2">
     <h2>2. A Brief History of Fixed-Point</h2>
     <p>NES programmers did not invent fixed-point arithmetic. The idea of representing fractions by agreeing where an imaginary decimal point sits inside a number is centuries old. Mechanical calculators in the 1600s used it - the operator decided that the last two wheels on the machine represented hundredths, and built their arithmetic accordingly. The machine had no notion of a decimal point. The human imposed it.</p>
-    <p>Digital signal processing (DSP) chips in the 1970s formalized the technique. The Motorola 56000, a workhorse of early digital audio, used a 24-bit fixed-point format natively. By the time the Famicom shipped in 1983, fixed-point was a standard tool in embedded programming. What NES programmers contributed was not the concept but the specific adaptations: the 4.4 format for velocity, the sub-pixel accumulator trick, and the carry-chain position system - all shaped by the 6502's particular strengths and limitations.</p>
+    <p>Digital signal processing (DSP) chips in the 1970s formalized the technique. The Motorola 56000, a workhorse of early digital audio, used a 24-bit fixed-point format natively. By the early-to-mid 1980s, when the NES's Ricoh 2A03 CPU was designed, fixed-point was a standard tool in embedded programming. What NES programmers contributed was not the concept but the specific adaptations: the 4.4 format for velocity, the sub-pixel accumulator trick, and the carry-chain position system - all shaped by the 6502's particular strengths and limitations.</p>
     <p><strong>Terminology note:</strong> "Fixed-point arithmetic" (this article) and "fixed point of a function" (where f(x) = x) are unrelated concepts that share a name. If you encounter "fixed point" in a math or computer science context, check which one is meant. This article is entirely about the arithmetic - representing fractions with integer bytes.</p>
     <p>The idea is simple, and a money analogy makes it concrete. The price &euro;3.99 can also be written as 399 cents - same value, no decimal point. You convert between the two by multiplying or dividing by 100. But 100 is a power of 10, and 8-bit CPUs are bad at powers of 10. They are very good at powers of 2. So instead of grouping by hundreds (10&sup2;), fixed-point groups by 256 (2&#8312;). Multiplying by 256 is a single byte shift. Dividing by 256 is reading the high byte of a two-byte value. The arithmetic maps directly onto what the hardware can do.</p>
     <p>Take an integer byte. Declare that some of its bits represent whole units and the rest represent fractions. The hardware does not know or care - it adds bytes the same way regardless. The programmer enforces the convention by placing results into the right memory locations and by interpreting the output correctly.</p>
@@ -61,12 +61,12 @@ Page</code></pre>
       <li><strong>An 8-bit ALU.</strong> Every register holds one byte: 0 to 255 unsigned, or -128 to +127 signed. There are no 16-bit registers, no 32-bit accumulator, no wide operations.</li>
       <li><strong>ADC and SBC.</strong> Add-with-carry and subtract-with-borrow. These are the <em>only</em> arithmetic instructions. There is no "plain add" - the carry flag is always involved. <code>CLC</code> before addition, <code>SEC</code> before subtraction, every time.</li>
       <li><strong>Shifts and rotates.</strong> ASL (shift left, multiply by 2), LSR (shift right, divide by 2), ROL and ROR (rotate through carry for multi-byte shifts). These are the only way to multiply or divide.</li>
-      <li><strong>No multiply instruction.</strong> To multiply two numbers, you write a loop: shift the multiplier right, check the carry, conditionally add the multiplicand, repeat eight times. It costs roughly 70-100 cycles. Nintendo avoided it wherever possible.</li>
-      <li><strong>No divide instruction.</strong> Division is even worse - repeated subtraction with shift. The game simply does not divide.</li>
-      <li><strong>No working decimal mode.</strong> The original 6502 has a BCD (binary-coded decimal) mode activated by <code>SED</code>. The NES's Ricoh 2A03 removed it - the instruction exists but does nothing. If you see <code>CLD</code> (clear decimal) in SMBDIS.ASM, it is a safety habit from 6502 programming, not a functional requirement. Your port can ignore it.</li>
+      <li><strong>No multiply instruction.</strong> To multiply two numbers, you write a loop: shift the multiplier right, check the carry, conditionally add the multiplicand, repeat eight times. It costs roughly 70-100 cycles. NES developers avoided it wherever possible.</li>
+      <li><strong>No divide instruction.</strong> Division is even worse - repeated subtraction with shift. Most games simply do not divide.</li>
+      <li><strong>No working decimal mode.</strong> The original 6502 has a BCD (binary-coded decimal) mode activated by <code>SED</code>. The NES's Ricoh 2A03 removed it - the instruction exists but does nothing. If you see <code>CLD</code> (clear decimal) in an NES disassembly, it is a safety habit from 6502 programming, not a functional requirement. Your port can ignore it.</li>
       <li><strong>The carry flag.</strong> This single bit is the 6502's superpower for multi-byte math. When an 8-bit addition overflows past 255, the carry flag is set to 1. The next ADC instruction automatically includes it. This lets you chain additions across as many bytes as you need, with no extra logic.</li>
     </ul>
-    <p>These constraints explain everything that follows. SMB uses lookup tables instead of multiplication. It uses bit shifts instead of division. It represents fractions using byte conventions instead of floating-point. It chains single-byte additions through the carry flag to accumulate precision across multiple bytes.</p>
+    <p>These constraints explain everything that follows. NES platformers use lookup tables instead of multiplication. They use bit shifts instead of division. They represent fractions using byte conventions instead of floating-point. They chain single-byte additions through the carry flag to accumulate precision across multiple bytes.</p>
     <p>The 6502 has one more relevant property: it does not distinguish signed from unsigned arithmetic. ADC adds two bytes and sets the carry flag. It does not know or care whether those bytes represent 200 + 100 (unsigned) or -56 + 100 (signed, via two's complement). The bits are the same. The flags are set the same way. The programmer decides the interpretation.</p>
   </section>
 
@@ -83,7 +83,7 @@ Page</code></pre>
       <div class="bit-grid" id="adc-grid"></div>
       <p id="adc-result" class="result-line">&nbsp;</p>
     </div>
-    <p class="hint">Try a=144 (0x90), b=144 (0x90), carry=0. This is the exact sub-pixel overflow from Mario's run speed - see "the sub-pixel accumulator" further down.</p>
+    <p class="hint">Try a=144 (0x90), b=144 (0x90), carry=0. This is the exact sub-pixel overflow from a common 9/16 run-speed fraction - see "the sub-pixel accumulator" further down.</p>
   </section>
 
   <section class="exercise" id="exercise-sbc">
@@ -104,9 +104,9 @@ Page</code></pre>
 
   <section class="prose" id="sec-4">
     <h2>4. Why Not Floating-Point?</h2>
-    <p>A reasonable question. The 6502 had no floating-point hardware, but it could do software float. Applesoft BASIC, which shipped with the Apple II in 1977, included a full floating-point library written by Steve Wozniak. IEEE 754 - the standard that defines <code>float32</code> and <code>float64</code> - was finalized in 1985, the same year Super Mario Bros. released. Floating-point existed. Nintendo chose not to use it.</p>
+    <p>A reasonable question. The 6502 had no floating-point hardware, but it could do software float. Applesoft BASIC, which shipped with the Apple II in 1977, included a full floating-point library written by Steve Wozniak. IEEE 754 - the standard that defines <code>float32</code> and <code>float64</code> - was finalized in 1985, the same year the NES launched in North America. Floating-point existed. NES developers largely chose not to use it for real-time physics.</p>
     <h3>The speed problem</h3>
-    <p>A software float multiply on the 6502 costs roughly 200-300 cycles. The NES CPU runs at 1.79 MHz, giving about 29,780 cycles per frame at 60fps. One float multiply consumes 1% of the entire frame budget. Mario's physics runs dozens of add/subtract/compare operations per frame across the player, enemies, fireballs, and platforms. Replacing each integer operation with a float equivalent would consume the CPU many times over. Fixed-point operations - ADC, SBC, ASL, LSR - cost 2-5 cycles each. The performance gap is 50-100x.</p>
+    <p>A software float multiply on the 6502 costs roughly 200-300 cycles. The NES CPU runs at 1.79 MHz, giving about 29,780 cycles per frame at 60fps. One float multiply consumes 1% of the entire frame budget. A platformer's physics runs dozens of add/subtract/compare operations per frame across the player, enemies, projectiles, and platforms. Replacing each integer operation with a float equivalent would consume the CPU many times over. Fixed-point operations - ADC, SBC, ASL, LSR - cost 2-5 cycles each. The performance gap is 50-100x.</p>
     <h3>The precision model is different</h3>
     <p>Floating-point and fixed-point store fractions differently, and the difference matters for game physics.</p>
     <p>A floating-point number has three parts: a <strong>sign bit</strong>, an <strong>exponent</strong> (which sets the scale), and a <strong>mantissa</strong> (which sets the precision within that scale):</p>
@@ -120,15 +120,15 @@ Value = (-1)^S &times; 2^(E - 15) &times; (1 + M/1024)</code></pre>
           4     4 bits
 
 Value = I + F/16</code></pre>
-    <p>This gives <em>absolute</em> precision - the spacing between representable values is always exactly 1/16, regardless of magnitude. Mario at speed 1.0 has the same precision as Mario at speed 2.5. No degradation. No surprises.</p>
+    <p>This gives <em>absolute</em> precision - the spacing between representable values is always exactly 1/16, regardless of magnitude. A character at speed 1.0 has the same precision as at speed 2.5. No degradation. No surprises.</p>
     <h3>Uniform gaps are an advantage for games</h3>
-    <p>In a game, you constantly compare speeds to thresholds. SMB checks <code>Player_XSpeedAbsolute &gt;= $1C</code> to decide if Mario is running. It checks <code>Player_XSpeedAbsolute &lt; $0B</code> for the skid snap. These comparisons work perfectly in fixed-point because every value is an exact multiple of 1/16.</p>
+    <p>In a game, you constantly compare speeds to thresholds - checking whether a character's absolute speed is at or above a "running" threshold, or below a "skid" threshold. These comparisons work perfectly in fixed-point because every value is an exact multiple of 1/16.</p>
     <p>In floating-point, the value you store might not be the value you wrote. <code>0.1 + 0.2 = 0.30000000000000004</code> in <code>float64</code>. Fixed-point cannot represent 0.1 either - the closest 4.4 value is 2/16 = 0.125 - but the set of representable values is known in advance and never changes. There are no hidden rounding surprises. A <code>CMP #$10</code> either passes or it does not.</p>
     <h3>Determinism</h3>
     <p>Fixed-point integer math produces identical results on every CPU, every compiler, every platform. The same inputs always yield the same outputs. This is the property that makes NES speedrunning possible - runners rely on frame-perfect tricks that work because the game is fully deterministic.</p>
     <p>Floating-point breaks this guarantee. Different CPUs may use different intermediate precision (80-bit x87 registers vs 64-bit SSE). Compilers may fuse multiply-add into a single FMA instruction that rounds differently. Go's <code>float64</code> may give subtly different results on ARM vs x86. For a game port that must feel like the original, this matters.</p>
     <h3>Frame rate normalization</h3>
-    <p>Fixed-point also solves a problem you will face on PC: variable refresh rates. The NES ran at exactly 60fps (NTSC) or 50fps (PAL). PAL games were 20% slower unless the developer compensated by multiplying all speeds by 1.2 - something only fixed-point made possible on integer hardware. On PC, monitors run at 60, 120, 144, or 240 Hz. If your port assumes 60fps and someone plays on a 120 Hz display, you need the same kind of scaling. Integer fixed-point handles this cleanly: multiply the speed byte by a frame-rate ratio stored as an 8.8 value. No floating-point rounding surprises.</p>
+    <p>Fixed-point also solves a problem you will face on PC: variable refresh rates. The NES ran at exactly 60fps (NTSC) or 50fps (PAL). PAL games were often 20% slower unless the developer compensated by multiplying all speeds by 1.2 - something only fixed-point made possible on integer hardware. On PC, monitors run at 60, 120, 144, or 240 Hz. If your port assumes 60fps and someone plays on a 120 Hz display, you need the same kind of scaling. Integer fixed-point handles this cleanly: multiply the speed byte by a frame-rate ratio stored as an 8.8 value. No floating-point rounding surprises.</p>
   </section>
 
   <section class="prose" id="sec-5">
@@ -142,18 +142,18 @@ Value = I + F/16</code></pre>
     <p>This is called <strong>4.4 format</strong>. Four bits for the integer, four bits for the fraction.</p>
     <h3>Why /16?</h3>
     <p>Four bits can hold 2&#8308; = 16 distinct values (0 through 15). Each value represents one sixteenth of a pixel. The denominator is always 16 because the number of bits determines the denominator: N fraction bits give you a denominator of 2^N.</p>
-    <p>If the fraction were 5 bits, the denominator would be 32. If 8 bits, 256. Nintendo chose 4 because splitting a byte exactly in half is free - it costs only a few shift instructions to isolate each half, and a byte is the natural unit of everything on the 6502.</p>
+    <p>If the fraction were 5 bits, the denominator would be 32. If 8 bits, 256. Splitting a byte exactly in half is free - it costs only a few shift instructions to isolate each half, and a byte is the natural unit of everything on the 6502.</p>
     <h3>Every possible fraction in 4.4</h3>
     <p>There are exactly 16 fractional values. No others exist in this format:</p>
     <pre><code>0/16 = 0.0000      8/16 = 0.5000
-1/16 = 0.0625      9/16 = 0.5625   &larr; Mario's run speed fraction
+1/16 = 0.0625      9/16 = 0.5625   &larr; a common run speed fraction
 2/16 = 0.1250     10/16 = 0.6250
 3/16 = 0.1875     11/16 = 0.6875
 4/16 = 0.2500     12/16 = 0.7500
 5/16 = 0.3125     13/16 = 0.8125
 6/16 = 0.3750     14/16 = 0.8750
 7/16 = 0.4375     15/16 = 0.9375</code></pre>
-    <p>If you wanted exactly 1.5 pixels per frame, you could not have it - the closest options are 8/16 = 0.5000 or 9/16 = 0.5625. Nintendo chose 9/16, giving Mario a run speed of 1.5625. They did not pick 1.5625 as a decimal; they picked <code>$19</code> as a byte, and 1.5625 is what falls out.</p>
+    <p>If you wanted exactly 1.5 pixels per frame, you could not have it - the closest options are 8/16 = 0.5000 or 9/16 = 0.5625. A designer choosing 9/16 gives a run speed of 1.5625. They did not pick 1.5625 as a decimal; they picked <code>$19</code> as a byte, and 1.5625 is what falls out.</p>
     <h3>Precision at different speeds</h3>
     <p>The step size in 4.4 is always 1/16 - but the <em>relative</em> precision depends on the magnitude:</p>
     <table>
@@ -165,29 +165,29 @@ Value = I + F/16</code></pre>
         <tr><td>2.5</td><td><code>$28</code></td><td>1/16</td><td>2.5%</td></tr>
       </tbody>
     </table>
-    <p>Compare to IEEE float16 with machine epsilon &epsilon; = 2^-11 &approx; 0.05% relative precision everywhere. Float16 sounds better on paper. But fixed-point's absolute uniformity means no precision surprises when comparing speeds to thresholds. The skid snap triggers at exactly <code>$0B</code>. The run detection triggers at exactly <code>$1C</code>. These comparisons never suffer from rounding - the value is either above the threshold or it is not. In float, a rounding error of &epsilon; on a threshold comparison could trigger a state change one frame early or late.</p>
+    <p>Compare to IEEE float16 with machine epsilon &epsilon; = 2^-11 &approx; 0.05% relative precision everywhere. Float16 sounds better on paper. But fixed-point's absolute uniformity means no precision surprises when comparing speeds to thresholds. A skid-snap check triggers at exactly the same byte value every time; a run-detection check does too. These comparisons never suffer from rounding - the value is either above the threshold or it is not. In float, a rounding error of &epsilon; on a threshold comparison could trigger a state change one frame early or late.</p>
     <h3>Maximum and minimum values</h3>
     <p><strong>Unsigned 4.4:</strong> The largest value is <code>$FF</code> = 15 + 15/16 = <strong>15.9375</strong>. The smallest nonzero value is <code>$01</code> = 0 + 1/16 = <strong>0.0625</strong>.</p>
-    <p><strong>Signed 4.4</strong> (two's complement, which SMB uses for speed): The range is <strong>-8.0</strong> (<code>$80</code>) to <strong>+7.9375</strong> (<code>$7F</code>). The smallest positive change is still 1/16 = 0.0625.</p>
+    <p><strong>Signed 4.4</strong> (two's complement, the convention used for signed speed bytes): The range is <strong>-8.0</strong> (<code>$80</code>) to <strong>+7.9375</strong> (<code>$7F</code>). The smallest positive change is still 1/16 = 0.0625.</p>
     <h3>Lowest possible acceleration in 4.4</h3>
-    <p><strong>0.0625 pixels per frame per frame.</strong> That is 1/16 of a pixel of speed gained each frame. At 60 frames per second, it would take 16 frames (0.27 seconds) to accelerate by a single pixel per frame. For walk speed (1.0 px/frame), reaching full speed from standstill would take 16 frames.</p>
-    <p>For gravity, this is far too coarse. A jump that peaks at 66 pixels needs subtle, gradual deceleration - much less than 1/16 per frame. That is why SMB uses a different format for forces (<a href="#sec-7">section 7</a>).</p>
-    <h3>Mario's horizontal speeds in 4.4</h3>
-    <p>These are all <code>SprObject_X_Speed</code> values, split by <code>MoveObjectHorizontally</code> exactly as described above:</p>
+    <p><strong>0.0625 pixels per frame per frame.</strong> That is 1/16 of a pixel of speed gained each frame. At 60 frames per second, it would take 16 frames (0.27 seconds) to accelerate by a single pixel per frame. For a nominal walk speed of 1.0 px/frame, reaching full speed from standstill would take 16 frames.</p>
+    <p>For gravity, this is far too coarse. A jump that peaks at dozens of pixels needs subtle, gradual deceleration - much less than 1/16 per frame. That is why fixed-point gravity systems use a different format for forces (<a href="#sec-7">section 7</a>).</p>
+    <h3>Example horizontal speeds in 4.4</h3>
+    <p>These are all example <code>XSpeed</code> values, split by a horizontal movement routine exactly as described above:</p>
     <table>
       <thead><tr><th>Hex</th><th>Calculation</th><th>Decimal</th><th>What it is</th></tr></thead>
       <tbody>
-        <tr><td><code>$10</code></td><td>16/16</td><td>1.0</td><td>Walk speed (max, no B button)</td></tr>
+        <tr><td><code>$10</code></td><td>16/16</td><td>1.0</td><td>Walk speed (max, no run button)</td></tr>
         <tr><td><code>$19</code></td><td>25/16</td><td>1.5625</td><td>Run speed (observed max)</td></tr>
-        <tr><td><code>$28</code></td><td>40/16</td><td>2.5</td><td>Run speed (table max, B held)</td></tr>
-        <tr><td><code>$0C</code></td><td>12/16</td><td>0.75</td><td>Pipe entrance speed</td></tr>
+        <tr><td><code>$28</code></td><td>40/16</td><td>2.5</td><td>Run speed (table max, run button held)</td></tr>
+        <tr><td><code>$0C</code></td><td>12/16</td><td>0.75</td><td>Pipe/warp entrance speed</td></tr>
       </tbody>
     </table>
   </section>
 
   <section class="exercise" id="exercise-split">
     <h2>Try it: split a Q4.4 speed byte</h2>
-    <p>SMB's horizontal speed is one byte: the high nybble is whole pixels, the low nybble is a fraction. Enter any byte and see the nybble split - including the $FC trap that fooled an earlier draft of this very article (it's <strong>not</strong> -4.0 - see the hint, and "vertical speed is not 4.4" below).</p>
+    <p>A horizontal speed byte splits into a whole-pixel high nybble and a fractional low nybble. Enter any byte and see the nybble split - including the $FC trap that fooled an earlier draft of this very article (it's <strong>not</strong> -4.0 - see the hint, and "vertical speed is not 4.4" below).</p>
     <div class="controls">
       <label>speed byte (hex) <input type="text" id="split-hex" value="19" maxlength="2"></label>
       <button onclick="runSplit()">Split</button>
@@ -196,41 +196,41 @@ Value = I + F/16</code></pre>
       <div class="nybble-grid" id="split-grid"></div>
       <p id="split-result" class="result-line">&nbsp;</p>
     </div>
-    <p class="hint">Try 19 (Mario's run speed, 1.5625 px/frame), then FC (a vertical jump velocity that is NOT meant to be split like this at all).</p>
+    <p class="hint">Try 19 (a common run speed, 1.5625 px/frame), then FC (a vertical jump velocity that is NOT meant to be split like this at all).</p>
   </section>
 
   <section class="prose" id="sec-5b">
     <h3>Vertical speed is not 4.4</h3>
-    <p><code>PlayerYSpdData</code> supplies the initial value of <code>SprObject_Y_Speed</code> when Mario jumps: <code>$FC, $FC, $FC, $FB, $FB, $FE, $FF</code> (SMBDIS.ASM:6020). It is tempting to read these the same way as the horizontal table above - split the byte, treat the high nybble as pixels and the low nybble as a fraction. That would be wrong. Vertical and horizontal speed are stored in two genuinely different formats:</p>
+    <p>A jump-initiation table might supply the initial value of a <code>YSpeed</code> byte when the player jumps: values like <code>$FC, $FC, $FC, $FB, $FB, $FE, $FF</code>. It is tempting to read these the same way as the horizontal table above - split the byte, treat the high nybble as pixels and the low nybble as a fraction. That would be wrong. Vertical and horizontal speed are commonly stored in two genuinely different formats:</p>
     <ul>
-      <li><strong>Horizontal</strong> (<code>MoveObjectHorizontally</code>, SMBDIS.ASM:7541): <code>X_Speed</code> is nybble-split every frame - high nybble is the whole-pixel delta, low nybble (scaled to /256) is the sub-pixel fraction.</li>
-      <li><strong>Vertical</strong> (<code>ImposeGravity</code>, SMBDIS.ASM:7704): <code>Y_Speed</code> is added to <code>Y_Position</code> as a <strong>raw signed whole byte</strong>, with no split at all:
-        <pre><code>lda SprObject_Y_Speed,x      ; A = Y_Speed, the whole byte, unsplit
+      <li><strong>Horizontal</strong> (a <code>MoveHorizontally</code>-style routine): <code>XSpeed</code> is nybble-split every frame - high nybble is the whole-pixel delta, low nybble (scaled to /256) is the sub-pixel fraction.</li>
+      <li><strong>Vertical</strong> (an <code>ApplyGravity</code>-style routine): <code>YSpeed</code> is added to <code>YPosition</code> as a <strong>raw signed whole byte</strong>, with no split at all:
+        <pre><code>lda YSpeed,x                 ; A = YSpeed, the whole byte, unsplit
 ...
-adc SprObject_Y_Position,x   ; Position += Y_Speed + carry
-sta SprObject_Y_Position,x</code></pre>
-        So <code>$FC</code> as vertical speed is simply <code>int8(0xFC) = -4</code>: Mario moves up 4 whole pixels per frame from this value alone, not -0.25. <code>$FB</code> = -5, the running jump's slightly stronger initial velocity.
+adc YPosition,x              ; Position += YSpeed + carry
+sta YPosition,x</code></pre>
+        So <code>$FC</code> as vertical speed is simply <code>int8(0xFC) = -4</code>: the character moves up 4 whole pixels per frame from this value alone, not -0.25. <code>$FB</code> = -5, a slightly stronger initial velocity for a running jump.
       </li>
     </ul>
-    <p>This does not mean vertical motion has no sub-pixel precision - it does, but it comes from a completely different mechanism than horizontal's nybble split. Two accumulator bytes, <code>SprObject_Y_MoveForce</code> and <code>SprObject_YMF_Dummy</code>, form a second, independent carry chain: <code>Y_MoveForce</code> accumulates the gravity force value every frame, and its overflow increments <code>Y_Speed</code> by one whole unit (not 1/16 - see the worked trace in <a href="#sec-7">section 7</a>, which is accurate for how <em>fast <code>Y_Speed</code> changes</em>, but does not describe how <code>Y_Speed</code> is applied to position). Separately, <code>YMF_Dummy</code> accumulates <code>Y_MoveForce</code>'s value from <em>before</em> that frame's update, and it is <em>that</em> accumulator's overflow - not any split of <code>Y_Speed</code> - which contributes the extra +1/-1 pixel of position movement on top of <code>Y_Speed</code>'s raw whole-pixel value each frame. The carry from the <code>YMF_Dummy</code> addition survives across several unrelated instructions (<code>LDY</code>, <code>LDA</code>, <code>BPL</code>, <code>DEY</code>, <code>STY</code> do not touch the carry flag) and is still sitting in the carry flag by the time <code>ImposeGravity</code> reaches <code>ADC SprObject_Y_Position,x</code> - a subtle but load-bearing detail of the 6502 carry model, not a fixed-point format at all.</p>
+    <p>This does not mean vertical motion has no sub-pixel precision - it does, but it comes from a completely different mechanism than horizontal's nybble split. Two accumulator bytes, <code>YMoveForce</code> and <code>YMoveForceDelay</code>, form a second, independent carry chain: <code>YMoveForce</code> accumulates the gravity force value every frame, and its overflow increments <code>YSpeed</code> by one whole unit (not 1/16 - see the worked trace in <a href="#sec-7">section 7</a>, which is accurate for how <em>fast <code>YSpeed</code> changes</em>, but does not describe how <code>YSpeed</code> is applied to position). Separately, <code>YMoveForceDelay</code> accumulates <code>YMoveForce</code>'s value from <em>before</em> that frame's update, and it is <em>that</em> accumulator's overflow - not any split of <code>YSpeed</code> - which contributes the extra +1/-1 pixel of position movement on top of <code>YSpeed</code>'s raw whole-pixel value each frame. The carry from the <code>YMoveForceDelay</code> addition survives across several unrelated instructions that do not touch the carry flag, and is still sitting in the carry flag by the time the gravity routine reaches its position update - a subtle but load-bearing detail of the 6502 carry model, not a fixed-point format at all.</p>
     <h3>Other fixed-point formats from the era</h3>
     <p>The 4.4 split is not the only option. Different games and platforms chose different trade-offs:</p>
     <table>
       <thead><tr><th>Format</th><th>Bits</th><th>Precision</th><th>Range (unsigned)</th><th>Used By</th></tr></thead>
       <tbody>
-        <tr><td>4.4</td><td>8 (1 byte)</td><td>1/16</td><td>0 to 15.9375</td><td>SMB horizontal velocities</td></tr>
-        <tr><td>8.8</td><td>16 (2 bytes)</td><td>1/256</td><td>0 to 255.996</td><td>SMB forces, SNES games</td></tr>
-        <tr><td>1.7</td><td>8 (1 byte)</td><td>1/128</td><td>0 to 1.992</td><td>Sonic the Hedgehog sub-pixel</td></tr>
+        <tr><td>4.4</td><td>8 (1 byte)</td><td>1/16</td><td>0 to 15.9375</td><td>Classic NES platformer horizontal velocities</td></tr>
+        <tr><td>8.8</td><td>16 (2 bytes)</td><td>1/256</td><td>0 to 255.996</td><td>NES forces, SNES games</td></tr>
+        <tr><td>1.7</td><td>8 (1 byte)</td><td>1/128</td><td>0 to 1.992</td><td>Sub-pixel schemes in later 16-bit platformers</td></tr>
         <tr><td>12.4</td><td>16 (2 bytes)</td><td>1/16</td><td>0 to 4095.9375</td><td>Some SNES position systems</td></tr>
         <tr><td>16.16</td><td>32 (4 bytes)</td><td>1/65536</td><td>0 to 65535.999</td><td>DOOM (1993, PC)</td></tr>
       </tbody>
     </table>
-    <p>The choice always reflects the same trade-off: more fraction bits give finer precision but reduce the integer range. The 6502's 8-bit bus makes single-byte formats cheapest, which is why SMB squeezes velocity into 4.4 and only uses two-byte formats when it must.</p>
+    <p>The choice always reflects the same trade-off: more fraction bits give finer precision but reduce the integer range. The 6502's 8-bit bus makes single-byte formats cheapest, which is why NES platformers squeeze velocity into 4.4 and only use two-byte formats when they must.</p>
   </section>
 
   <section class="prose" id="sec-6">
     <h2>6. Two's Complement for Programmers</h2>
-    <p>Mario moves left and right. Speed must be signed - positive for right, negative for left. The 6502 uses two's complement for signed numbers, and understanding it is essential for porting.</p>
+    <p>A platforming character moves left and right. Speed must be signed - positive for right, negative for left. The 6502 uses two's complement for signed numbers, and understanding it is essential for porting.</p>
     <h3>The odometer analogy</h3>
     <p>Imagine a car odometer that reads 000 to 255 and wraps around. Drive forward one mile from 000 and it reads 001. Now drive <em>backward</em> one mile from 000 - it wraps to 255. So 255 represents -1. Drive backward two miles: 254 = -2. Drive backward 128 miles: 128 = -128.</p>
     <p>The upper half of the byte (128-255) represents negative numbers. The lower half (0-127) represents positive numbers. The conversion rule: to negate a number, invert all bits and add 1.</p>
@@ -246,10 +246,10 @@ sta SprObject_Y_Position,x</code></pre>
   Answer: 2. Correct.</code></pre>
     <p>The carry flag handles the wrap. The 6502's ADC instruction adds two bytes plus carry, sets flags, and stores the result. It has no concept of sign. The programmer interprets the result as signed or unsigned based on context.</p>
     <h3>Signed 4.4 in practice</h3>
-    <p>In signed 4.4, the range is -8.0 to +7.9375. The format can represent speeds well beyond what SMB uses:</p>
+    <p>In signed 4.4, the range is -8.0 to +7.9375. The format can represent speeds well beyond what a typical platformer uses:</p>
     <pre><code>Maximum positive: $7F = +7.9375 px/frame (&approx; 476 pixels/second)
 Maximum negative: $80 = -8.0 px/frame (&approx; 480 pixels/second)</code></pre>
-    <p>Mario's actual maximum run speed is $28 = +2.5 px/frame (going right), or $D8 = -2.5 px/frame (going left). This is well within the format's limits. Nintendo did not choose 4.4 to accommodate extreme speeds - they chose it because it packs a useful integer range and sufficient fractional precision into a single byte. The format was chosen for the math, not the range. The +2.5 cap is a <em>game design</em> decision stored in a lookup table (<code>MaxRightXSpdData</code>), not a format limitation.</p>
+    <p>A typical maximum run speed might be $28 = +2.5 px/frame (going right), or $D8 = -2.5 px/frame (going left) - well within the format's limits. Designers did not choose 4.4 to accommodate extreme speeds - they chose it because it packs a useful integer range and sufficient fractional precision into a single byte. The format was chosen for the math, not the range. A specific speed cap like +2.5 is a <em>game design</em> decision stored in a lookup table, not a format limitation.</p>
   </section>
 
   <section class="exercise" id="exercise-negate">
@@ -263,13 +263,13 @@ Maximum negative: $80 = -8.0 px/frame (&approx; 480 pixels/second)</code></pre>
       <div class="bit-grid" id="negate-grid"></div>
       <p id="negate-result" class="result-line">&nbsp;</p>
     </div>
-    <p class="hint">40 (0x28) is Mario's max run speed, +2.5 px/frame. Negate it and get 0xD8, -2.5 px/frame (running left). Then try 128 (0x80) for the wrap-to-itself edge case.</p>
+    <p class="hint">40 (0x28) is a typical max run speed, +2.5 px/frame. Negate it and get 0xD8, -2.5 px/frame (running left). Then try 128 (0x80) for the wrap-to-itself edge case.</p>
   </section>
 
   <section class="prose" id="sec-7">
     <h2>7. When 4.4 Is Not Enough: The 8.8 Format</h2>
-    <p>The smallest speed change possible in 4.4 is 1/16 per frame. For horizontal movement, this is adequate - Mario accelerates noticeably each frame. But gravity is different. A good jump needs to feel smooth: the upward velocity should bleed away gradually over 20-30 frames, not in sudden 1/16-pixel steps.</p>
-    <p>SMB solves this with the <strong>8.8 format</strong>: two separate bytes, one for the integer part and one for the fraction.</p>
+    <p>The smallest speed change possible in 4.4 is 1/16 per frame. For horizontal movement, this is adequate - a character accelerates noticeably each frame. But gravity is different. A good jump needs to feel smooth: the upward velocity should bleed away gradually over 20-30 frames, not in sudden 1/16-pixel steps.</p>
+    <p>Fixed-point gravity systems solve this with the <strong>8.8 format</strong>: two separate bytes, one for the integer part and one for the fraction.</p>
     <pre><code>Integer byte: holds the whole-pixel value (0 to 255, or signed -128 to +127)
 Fraction byte: holds the fractional part (0 to 255, representing 0/256 to 255/256)
 
@@ -285,21 +285,21 @@ Precision: 1/256 = 0.00390625</code></pre>
     <p>Result: 3.140625. The error is 0.000375 - lost in the truncation. For a game running on a 256-pixel-wide screen, this precision is more than sufficient. As one retro developer put it: "we're not going to notice 0.1 of a degree in accuracy."</p>
     <p>To convert back: divide by 256, or just read the high byte. On the 6502, this is a single <code>LDA</code> of the integer byte. No computation needed.</p>
     <h3>How the two formats interact</h3>
-    <p>SMB uses 4.4 for horizontal speed and 8.8-style accumulators for vertical forces, but they are not one single chain feeding into the next - vertical physics runs <strong>two parallel accumulator chains that share a byte</strong>, not four sequential levels:</p>
-    <pre><code>Chain A (changes Y_Speed):     force &rarr; accumulates into &rarr; Y_MoveForce &rarr; carry &rarr; Y_Speed
-Chain B (changes Y_Position):  Y_MoveForce's OLD value &rarr; accumulates into &rarr; YMF_Dummy &rarr; carry &rarr; Y_Position</code></pre>
-    <p><code>Y_MoveForce</code> is read twice every frame, at two different points in its lifecycle: first its value <em>from before this frame's update</em> feeds <code>YMF_Dummy</code> (Chain B), and only afterward does it receive this frame's gravity force and produce the carry that feeds <code>Y_Speed</code> (Chain A). This ordering is why they can share one byte instead of needing four separate ones.</p>
-    <p>Here is a concrete trace of Chain A with gravity force <code>$20</code> (the upward force during a standing jump hold) - this determines how fast <code>Y_Speed</code> itself changes, not how much the player moves that frame:</p>
-    <pre><code>Frame 1:  Y_MoveForce = $00 + $20 = $20.  No overflow. Y_Speed unchanged.
-Frame 2:  Y_MoveForce = $20 + $20 = $40.  No overflow. Y_Speed unchanged.
-Frame 3:  Y_MoveForce = $40 + $20 = $60.  No overflow. Y_Speed unchanged.
-Frame 4:  Y_MoveForce = $60 + $20 = $80.  No overflow. Y_Speed unchanged.
-Frame 5:  Y_MoveForce = $80 + $20 = $A0.  No overflow. Y_Speed unchanged.
-Frame 6:  Y_MoveForce = $A0 + $20 = $C0.  No overflow. Y_Speed unchanged.
-Frame 7:  Y_MoveForce = $C0 + $20 = $E0.  No overflow. Y_Speed unchanged.
-Frame 8:  Y_MoveForce = $E0 + $20 = $00.  OVERFLOW &rarr; Y_Speed += 1 (a whole unit, e.g. -4 becomes -3).</code></pre>
-    <p>It took <strong>8 frames</strong> for this force to change <code>Y_Speed</code> by a whole unit (not 1/16 - vertical speed has no fractional nybble; see "vertical speed is not 4.4" above). That is 0.125 pixels/frame&sup2; of effective acceleration on <code>Y_Speed</code> itself.</p>
-    <p>Separately, Chain B is running every one of those 8 frames too, using whatever <code>Y_MoveForce</code> held <em>before</em> that frame's force was added. This is what lets the player's on-screen position advance smoothly even during the 7 frames where <code>Y_Speed</code> itself hasn't changed yet - the position update each frame is <code>Y_Speed + carry from Chain B</code>, so an occasional Chain B overflow adds one extra pixel of movement independent of whether <code>Y_Speed</code> changed. Both chains together are the mechanism behind SMB's smooth jump arcs: <code>Y_Speed</code> steps in whole-pixel increments only every several frames, while Chain B smooths the position update in between.</p>
+    <p>A typical NES platformer uses 4.4 for horizontal speed and 8.8-style accumulators for vertical forces, but they are not one single chain feeding into the next - vertical physics runs <strong>two parallel accumulator chains that share a byte</strong>, not four sequential levels:</p>
+    <pre><code>Chain A (changes YSpeed):     force &rarr; accumulates into &rarr; YMoveForce &rarr; carry &rarr; YSpeed
+Chain B (changes YPosition):  YMoveForce's OLD value &rarr; accumulates into &rarr; YMoveForceDelay &rarr; carry &rarr; YPosition</code></pre>
+    <p><code>YMoveForce</code> is read twice every frame, at two different points in its lifecycle: first its value <em>from before this frame's update</em> feeds <code>YMoveForceDelay</code> (Chain B), and only afterward does it receive this frame's gravity force and produce the carry that feeds <code>YSpeed</code> (Chain A). This ordering is why they can share one byte instead of needing four separate ones.</p>
+    <p>Here is a concrete trace of Chain A with gravity force <code>$20</code> (the upward force during a standing jump hold) - this determines how fast <code>YSpeed</code> itself changes, not how much the character moves that frame:</p>
+    <pre><code>Frame 1:  YMoveForce = $00 + $20 = $20.  No overflow. YSpeed unchanged.
+Frame 2:  YMoveForce = $20 + $20 = $40.  No overflow. YSpeed unchanged.
+Frame 3:  YMoveForce = $40 + $20 = $60.  No overflow. YSpeed unchanged.
+Frame 4:  YMoveForce = $60 + $20 = $80.  No overflow. YSpeed unchanged.
+Frame 5:  YMoveForce = $80 + $20 = $A0.  No overflow. YSpeed unchanged.
+Frame 6:  YMoveForce = $A0 + $20 = $C0.  No overflow. YSpeed unchanged.
+Frame 7:  YMoveForce = $C0 + $20 = $E0.  No overflow. YSpeed unchanged.
+Frame 8:  YMoveForce = $E0 + $20 = $00.  OVERFLOW &rarr; YSpeed += 1 (a whole unit, e.g. -4 becomes -3).</code></pre>
+    <p>It took <strong>8 frames</strong> for this force to change <code>YSpeed</code> by a whole unit (not 1/16 - vertical speed has no fractional nybble; see "vertical speed is not 4.4" above). That is 0.125 pixels/frame&sup2; of effective acceleration on <code>YSpeed</code> itself.</p>
+    <p>Separately, Chain B is running every one of those 8 frames too, using whatever <code>YMoveForce</code> held <em>before</em> that frame's force was added. This is what lets the character's on-screen position advance smoothly even during the 7 frames where <code>YSpeed</code> itself hasn't changed yet - the position update each frame is <code>YSpeed + carry from Chain B</code>, so an occasional Chain B overflow adds one extra pixel of movement independent of whether <code>YSpeed</code> changed. Both chains together are the mechanism behind a smooth jump arc: <code>YSpeed</code> steps in whole-pixel increments only every several frames, while Chain B smooths the position update in between.</p>
   </section>
 
   <section class="exercise" id="exercise-accumulator">
@@ -319,23 +319,23 @@ Frame 8:  Y_MoveForce = $E0 + $20 = $00.  OVERFLOW &rarr; Y_Speed += 1 (a whole 
 
   <section class="prose" id="sec-7b">
     <h3>The clamp checks two things, not one</h3>
-    <p>Once <code>Y_Speed</code> has been incremented by Chain A's carry, <code>ImposeGravity</code> clamps it to a maximum falling speed. The obvious implementation is "if <code>Y_Speed &gt;= maxSpeed</code>, set it to <code>maxSpeed</code>." That is not what the ROM does:</p>
-    <pre><code>lda SprObject_Y_Speed,x      ; add carry to vertical speed and store
+    <p>Once <code>YSpeed</code> has been incremented by Chain A's carry, the gravity routine clamps it to a maximum falling speed. The obvious implementation is "if <code>YSpeed &gt;= maxSpeed</code>, set it to <code>maxSpeed</code>." That is not what a real ROM typically does:</p>
+    <pre><code>lda YSpeed,x                 ; add carry to vertical speed and store
 adc #$00
-sta SprObject_Y_Speed,x
+sta YSpeed,x
 cmp $02                      ; compare to maximum speed
 bmi ChkUpM                   ; if less than preset value, skip this part
-lda SprObject_Y_MoveForce,x
+lda YMoveForce,x
 cmp #$80                     ; if less positively than preset maximum, skip this part
 bcc ChkUpM
 lda $02
-sta SprObject_Y_Speed,x      ; keep vertical speed within maximum value
+sta YSpeed,x                 ; keep vertical speed within maximum value
 lda #$00
-sta SprObject_Y_MoveForce,x  ; clear fractional</code></pre>
-    <p>The clamp only fires when <strong>both</strong> conditions hold: <code>Y_Speed &gt;= maxSpeed</code>, <strong>and</strong> <code>Y_MoveForce &gt;= $80</code>. If <code>Y_Speed</code> has just reached (or slightly exceeded) the maximum but <code>Y_MoveForce</code>'s fractional half hasn't crossed the halfway point yet, the clamp does nothing this frame - <code>Y_Speed</code> is allowed to sit one unit above the nominal maximum until <code>Y_MoveForce</code> catches up.</p>
-    <p>This is not a bug, and it is not an approximation of "clamp when <code>Y_Speed &gt;= maxSpeed</code>" - it is a deliberate one-frame tolerance built into the comparison itself. A port that only checks <code>Y_Speed &gt;= maxSpeed</code> will clamp one frame earlier than the original in some cases, and the exact frame it happens on is precisely the kind of detail that separates a "close enough" port from a bit-exact one.</p>
+sta YMoveForce,x             ; clear fractional</code></pre>
+    <p>The clamp only fires when <strong>both</strong> conditions hold: <code>YSpeed &gt;= maxSpeed</code>, <strong>and</strong> <code>YMoveForce &gt;= $80</code>. If <code>YSpeed</code> has just reached (or slightly exceeded) the maximum but <code>YMoveForce</code>'s fractional half hasn't crossed the halfway point yet, the clamp does nothing this frame - <code>YSpeed</code> is allowed to sit one unit above the nominal maximum until <code>YMoveForce</code> catches up.</p>
+    <p>This is not a bug, and it is not an approximation of "clamp when <code>YSpeed &gt;= maxSpeed</code>" - it is a deliberate one-frame tolerance built into the comparison itself. A port that only checks <code>YSpeed &gt;= maxSpeed</code> will clamp one frame earlier than the original in some cases, and the exact frame it happens on is precisely the kind of detail that separates a "close enough" port from a bit-exact one.</p>
     <h3>The optional upward force: a second, mirrored chain sharing one byte</h3>
-    <p><code>ImposeGravity</code> has a second section (SMBDIS.ASM:7736-7758) that most objects never use. It applies a simultaneous <em>upward</em> deceleration in the same call that applied the downward force above, useful for objects whose motion is symmetric in both directions within a single frame - Red Koopa Paratroopa bouncing, and moving platforms that need to decelerate as they approach a boundary. The player never uses this path; its jump deceleration comes from the caller switching which force value it passes to the downward path (<code>JumpMForceData</code> while ascending, <code>FallMForceData</code> while falling), not from this built-in mechanism.</p>
+    <p>A gravity routine can have a second section that most objects never use. It applies a simultaneous <em>upward</em> deceleration in the same call that applied the downward force above, useful for objects whose motion is symmetric in both directions within a single frame - a bouncing enemy, or a moving platform that needs to decelerate as it approaches a boundary. The player character typically never uses this path; its jump deceleration comes from the caller switching which force value it passes to the downward path (a "rising" force table while ascending, a "falling" force table while falling), not from this built-in mechanism.</p>
     <pre><code>ChkUpM:  pla                          ; get value from stack
          beq ExVMove                  ; if set to zero, branch to leave
          lda $02
@@ -343,34 +343,34 @@ sta SprObject_Y_MoveForce,x  ; clear fractional</code></pre>
          tay
          iny
          sty $07                      ; store two's compliment here
-         lda SprObject_Y_MoveForce,x
+         lda YMoveForce,x
          sec                          ; subtract upward movement amount from contents
          sbc $01                      ; of movement force, note that $01 is twice as large as $00,
-         sta SprObject_Y_MoveForce,x  ; thus it effectively undoes add we did earlier
-         lda SprObject_Y_Speed,x
+         sta YMoveForce,x             ; thus it effectively undoes add we did earlier
+         lda YSpeed,x
          sbc #$00                     ; subtract borrow from vertical speed and store
-         sta SprObject_Y_Speed,x
+         sta YSpeed,x
          cmp $07                      ; compare vertical speed to two's compliment
          bpl ExVMove                  ; if less negatively than preset maximum, skip this part
-         lda SprObject_Y_MoveForce,x
+         lda YMoveForce,x
          cmp #$80                     ; check if fractional part is above certain amount,
          bcs ExVMove                  ; and if so, branch to leave
          lda $07
-         sta SprObject_Y_Speed,x      ; keep vertical speed within maximum value
+         sta YSpeed,x                 ; keep vertical speed within maximum value
          lda #$ff
-         sta SprObject_Y_MoveForce,x  ; clear fractional
+         sta YMoveForce,x             ; clear fractional
 ExVMove: rts                          ; leave!</code></pre>
     <p>Three things worth pulling out of this:</p>
     <ol>
-      <li><strong>It is gated by a value the caller pushed onto the stack before calling <code>ImposeGravity</code></strong>, not by whether the upward force happens to be zero. An object can have a nonzero upward-force constant configured and still skip this section entirely on frames where the caller didn't request it (Red Koopa Troopa configures <code>$01</code> = 6 regardless of direction, but only enables this section while actually moving upward).</li>
+      <li><strong>It is gated by a value the caller pushed onto the stack before calling the gravity routine</strong>, not by whether the upward force happens to be zero. An object can have a nonzero upward-force constant configured and still skip this section entirely on frames where the caller didn't request it.</li>
       <li><strong><code>SBC</code> replaces <code>ADC</code></strong> - this chain undoes part of what the downward chain just did, using the borrow convention (<a href="#sec-6">section 6</a>): a borrow from the <code>MoveForce</code> subtraction propagates into <code>Speed</code> via <code>SBC #$00</code>, decrementing it by one whole unit, the mirror image of the downward chain's <code>ADC #$00</code> incrementing it.</li>
       <li><strong>The clamp condition is mirrored, not identical.</strong> The downward clamp fires when <code>MoveForce &gt;= $80</code>; the upward clamp fires when <code>MoveForce &lt; $80</code> - the correct mirror image, because subtracting toward a negative limit and adding toward a positive limit cross their respective "halfway" thresholds from opposite sides. And the clamped <code>MoveForce</code> value differs too: the downward clamp resets it to <code>$00</code>, the upward clamp resets it to <code>$FF</code>.</li>
     </ol>
     <h3>Sub-pixel accumulation explained</h3>
     <p>The phrase "sub-pixel accumulation" means exactly this carry-chain process. A fractional amount is added to an accumulator byte each frame. Most frames, the byte just gets bigger and nothing visible happens. Occasionally it overflows past 255, setting the carry flag, and the next byte up in the chain gains 1. The overflow <em>is</em> the mechanism - there is no rounding, no truncation, no decision. The 6502's carry flag handles it automatically.</p>
     <p><strong>This byte is not a number. It is an accumulator.</strong> This is the most important distinction in NES math, and the reason generic fixed-point libraries cannot help you.</p>
-    <p>Think of the fractional accumulator as a <strong>delay counter</strong>. It does not represent a position. It counts up until enough fractional movement has built up to earn one whole pixel - then it overflows, the carry fires, and the pixel position advances. The next frame, the counter starts from wherever it wrapped to, not from zero. This is why position uses a separate sub-pixel byte (<code>X_MoveForce</code> at <code>$0400</code>) rather than being stored in 8.8 format. The sub-pixel byte is an accumulator, not a coordinate. It exists only to catch the fractional crumbs from each frame and occasionally promote them into a real pixel of movement.</p>
-    <p>One architectural benefit: code that reads only the integer position byte - collision checks, sprite rendering, camera logic - does not need to know about sub-pixels at all. The <code>LDA SprObject_X_Position,x</code> instruction loads one byte and gets a valid pixel coordinate. The sub-pixel system is invisible to everything except the movement routine that writes to it.</p>
+    <p>Think of the fractional accumulator as a <strong>delay counter</strong>. It does not represent a position. It counts up until enough fractional movement has built up to earn one whole pixel - then it overflows, the carry fires, and the pixel position advances. The next frame, the counter starts from wherever it wrapped to, not from zero. This is why position uses a separate sub-pixel byte (a <code>MoveForce</code>-style variable) rather than being stored in 8.8 format. The sub-pixel byte is an accumulator, not a coordinate. It exists only to catch the fractional crumbs from each frame and occasionally promote them into a real pixel of movement.</p>
+    <p>One architectural benefit: code that reads only the integer position byte - collision checks, sprite rendering, camera logic - does not need to know about sub-pixels at all. Loading the position byte gets a valid pixel coordinate directly. The sub-pixel system is invisible to everything except the movement routine that writes to it.</p>
   </section>
 
   <section class="exercise" id="exercise-vertical">
@@ -393,16 +393,16 @@ ExVMove: rts                          ; leave!</code></pre>
 
   <section class="prose" id="sec-8">
     <h2>8. The Nybble Split: How Speed Becomes Movement</h2>
-    <p>This is the core routine. Every moving object in SMB - Mario, enemies, fireballs, platforms - runs this code every frame. It is at line 7541 of SMBDIS.ASM:</p>
-    <pre><code>MoveObjectHorizontally:
-    lda SprObject_X_Speed,x     ; load speed byte (4.4 format)
+    <p>This is the core routine. Every moving object in a classic NES platformer - the player, enemies, projectiles, platforms - runs code like this every frame:</p>
+    <pre><code>MoveHorizontally:
+    lda XSpeed,x                ; load speed byte (4.4 format)
     asl                         ; shift left &times;4: move low nybble
     asl                         ;   to the high nybble position
     asl
     asl
     sta $01                     ; $01 = fractional adder
 
-    lda SprObject_X_Speed,x     ; load speed byte again
+    lda XSpeed,x                ; load speed byte again
     lsr                         ; shift right &times;4: move high nybble
     lsr                         ;   to the low nybble position
     lsr
@@ -439,35 +439,35 @@ But 14 is wrong. The original high nybble was $E (1110 in binary).
 In 4-bit signed, 1110 = -2. We need -2, not +14.</code></pre>
     <p>The <code>CMP #$08</code> checks if the 4-bit value is 8 or higher (meaning bit 3 is set, meaning the original 4-bit integer was negative). If so, <code>ORA #%11110000</code> fills the upper 4 bits with ones, turning <code>0000 1110</code> into <code>1111 1110</code> = -2 in signed 8-bit. This is <strong>sign extension</strong> - stretching a smaller signed value into a larger signed type by replicating the sign bit.</p>
     <h3>Full worked example: 4 frames at speed $19</h3>
-    <p>Starting state: <code>X_Position = $40</code>, <code>X_MoveForce = $00</code>, <code>X_PageLoc = $02</code>. Speed <code>$19</code> splits into: integer adder = $01, fractional adder = $90.</p>
+    <p>Starting state: <code>XPosition = $40</code>, <code>XMoveForce = $00</code>, <code>XPage = $02</code>. Speed <code>$19</code> splits into: integer adder = $01, fractional adder = $90.</p>
     <pre><code>Frame 1:
-  X_MoveForce = $00 + $90 = $90.  No overflow (carry = 0).
-  X_Position  = $40 + $01 + 0 = $41.
+  XMoveForce = $00 + $90 = $90.  No overflow (carry = 0).
+  XPosition  = $40 + $01 + 0 = $41.
   Moved 1 pixel.  (Position: page 2, pixel $41)
 
 Frame 2:
-  X_MoveForce = $90 + $90 = $20.  OVERFLOW (carry = 1).
-  X_Position  = $41 + $01 + 1 = $43.
+  XMoveForce = $90 + $90 = $20.  OVERFLOW (carry = 1).
+  XPosition  = $41 + $01 + 1 = $43.
   Moved 2 pixels.  (Position: page 2, pixel $43)
 
 Frame 3:
-  X_MoveForce = $20 + $90 = $B0.  No overflow (carry = 0).
-  X_Position  = $43 + $01 + 0 = $44.
+  XMoveForce = $20 + $90 = $B0.  No overflow (carry = 0).
+  XPosition  = $43 + $01 + 0 = $44.
   Moved 1 pixel.  (Position: page 2, pixel $44)
 
 Frame 4:
-  X_MoveForce = $B0 + $90 = $40.  OVERFLOW (carry = 1).
-  X_Position  = $44 + $01 + 1 = $46.
+  XMoveForce = $B0 + $90 = $40.  OVERFLOW (carry = 1).
+  XPosition  = $44 + $01 + 1 = $46.
   Moved 2 pixels.  (Position: page 2, pixel $46)</code></pre>
     <p>Pattern: 1, 2, 1, 2... The visible pixel movement alternates because the sub-pixel accumulator ($90 = 144/256) overflows every other frame. The average is (1+2)/2 = 1.5 pixels per frame, but the <em>actual</em> average over many frames converges to exactly 1.5625 because 144/256 = 9/16.</p>
-    <p>This alternating 1-2 pattern <strong>is</strong> Mario's run feel. It is not a bug or a rounding artifact. It is the deterministic consequence of integer arithmetic with sub-pixel accumulation.</p>
+    <p>This alternating 1-2 pattern is exactly what a run cycle at this speed looks like on real hardware. It is not a bug or a rounding artifact. It is the deterministic consequence of integer arithmetic with sub-pixel accumulation.</p>
     <h3>Why the oscillation does not matter</h3>
     <p>At 60 frames per second, the human eye cannot distinguish "moved 1 pixel" from "moved 2 pixels" on any single frame. It perceives the average: roughly 1.56 pixels per frame of smooth motion. The NES and modern AI share the same insight: <strong>match your precision to your output channel.</strong> The NES screen has 256&times;240 pixels with no sub-pixel rendering. Sub-pixel math buys smoothness <em>over time</em>, not per-frame accuracy.</p>
   </section>
 
   <section class="exercise" id="exercise-horizontal">
     <h2>Try it: horizontal motion, speed becomes movement</h2>
-    <p>Combine a Q4_4 speed with the sub-pixel accumulator and a page/pixel position, and you get SMB's actual per-frame movement routine above. The dot below is the object; the vertical line marks a page boundary (pixel 255 to 0).</p>
+    <p>Combine a Q4_4 speed with the sub-pixel accumulator and a page/pixel position, and you get the per-frame movement routine above. The dot below is the object; the vertical line marks a page boundary (pixel 255 to 0).</p>
     <div class="controls">
       <label>speed byte (hex) <input type="text" id="h-speed" value="19" maxlength="2"></label>
       <label>start pixel <input type="number" id="h-pixel" min="0" max="255" value="240"></label>
@@ -484,28 +484,28 @@ Frame 4:
 
   <section class="prose" id="sec-9">
     <h2>9. Lookup Tables Instead of Multiplication</h2>
-    <p>The 6502 cannot multiply efficiently, but many game calculations require something like multiplication - converting an index to an offset, scaling a speed, computing a position along a curve. SMB replaces all of these with pre-computed lookup tables stored in ROM.</p>
-    <h3>Example 1: FrictionData (line 6033)</h3>
-    <pre><code>FrictionData:
+    <p>The 6502 cannot multiply efficiently, but many game calculations require something like multiplication - converting an index to an offset, scaling a speed, computing a position along a curve. NES platformers replace all of these with pre-computed lookup tables stored in ROM.</p>
+    <h3>Example 1: a friction table</h3>
+    <pre><code>FrictionTable:
     .db $e4, $98, $d0</code></pre>
-    <p>Three bytes. The entire acceleration/deceleration system for horizontal movement. Instead of computing friction from a formula each frame, the game loads one of three pre-computed values based on the current state (running with B, walking, or decelerating). The index selects the value; no multiplication needed.</p>
-    <pre><code>lda FrictionData,y    ; Y = 0, 1, or 2. One instruction.</code></pre>
-    <h3>Example 2: FirebarPosLookupTbl (line 9678)</h3>
-    <p>Firebars rotate in circles. Circular motion requires sine and cosine - transcendental functions that would take hundreds of cycles to compute on a 6502. SMB does not compute them. It stores 99 pre-computed position offsets:</p>
-    <pre><code>FirebarPosLookupTbl:
+    <p>Three bytes. The entire acceleration/deceleration system for horizontal movement. Instead of computing friction from a formula each frame, the game loads one of three pre-computed values based on the current state (running, walking, or decelerating). The index selects the value; no multiplication needed.</p>
+    <pre><code>lda FrictionTable,y   ; Y = 0, 1, or 2. One instruction.</code></pre>
+    <h3>Example 2: a rotating hazard's position table</h3>
+    <p>Some NES obstacles rotate in circles. Circular motion requires sine and cosine - transcendental functions that would take hundreds of cycles to compute on a 6502. Rather than computing them, a game can store dozens of pre-computed position offsets:</p>
+    <pre><code>HazardPosTable:
     .db $00, $01, $03, $04, $05, $06, $07, $07, $08
     .db $00, $03, $06, $09, $0b, $0d, $0e, $0f, $10
     ; ... 9 more rows, 99 bytes total</code></pre>
-    <p>Each row represents a different distance from the center (each ball of the firebar). Each column represents an angular position. The game reads two values per frame - one horizontal, one vertical - and the firebar traces a smooth circle from nothing but table lookups, addition, and bit shifts.</p>
-    <h3>Example 3: Jump physics tables (line 6014)</h3>
+    <p>Each row represents a different distance from the center (each segment of the rotating hazard). Each column represents an angular position. The game reads two values per frame - one horizontal, one vertical - and the hazard traces a smooth circle from nothing but table lookups, addition, and bit shifts.</p>
+    <h3>Example 3: jump physics tables</h3>
     <p>Jump behavior is not computed from a formula. It is four parallel lookup tables:</p>
-    <pre><code>JumpMForceData:   .db $20, $20, $1e, $28, $28, $0d, $04
-FallMForceData:   .db $70, $70, $60, $90, $90, $0a, $09
-PlayerYSpdData:   .db $fc, $fc, $fc, $fb, $fb, $fe, $ff
-InitMForceData:   .db $00, $00, $00, $00, $00, $80, $00</code></pre>
-    <p>The player's horizontal speed at the moment of jumping selects an index (0-4 for ground jumps, 5-6 for swimming). That index pulls four values from four tables: upward force, downward force, initial Y speed, and initial motion force. The entire jump arc is determined by a single table lookup at the moment the player presses A.</p>
+    <pre><code>JumpForceTable:       .db $20, $20, $1e, $28, $28, $0d, $04
+FallForceTable:       .db $70, $70, $60, $90, $90, $0a, $09
+InitialYSpeedTable:   .db $fc, $fc, $fc, $fb, $fb, $fe, $ff
+InitialForceTable:    .db $00, $00, $00, $00, $00, $80, $00</code></pre>
+    <p>The player's horizontal speed at the moment of jumping selects an index (say, 0-4 for ground jumps, 5-6 for swimming). That index pulls four values from four tables: upward force, downward force, initial Y speed, and initial motion force. The entire jump arc is determined by a single table lookup at the moment the player presses the jump button.</p>
     <h3>Why lookup tables work here</h3>
-    <p>Lookup tables are practical when the input domain is small and known. Mario's friction has 3 states. The firebar has 11 distance tiers &times; 9 angular positions = 99 entries. Jump initiation has 7 speed tiers. A table that maps 7 inputs to 4 outputs costs 28 bytes of ROM and executes in a handful of cycles. On the NES, ROM is cheap (40 KB); CPU cycles during gameplay are precious.</p>
+    <p>Lookup tables are practical when the input domain is small and known. A friction system might have 3 states. A rotating hazard might have 11 distance tiers &times; 9 angular positions = 99 entries. Jump initiation might have 7 speed tiers. A table that maps 7 inputs to 4 outputs costs 28 bytes of ROM and executes in a handful of cycles. On the NES, ROM is cheap; CPU cycles during gameplay are precious.</p>
   </section>
 
   <section class="exercise" id="exercise-chain16">
@@ -564,7 +564,7 @@ if raw &gt;= 0x80 {             // step 3: was it negative?
 }</code></pre>
     <p>This matches the 6502 exactly: <code>LSR</code> &times;4 (unsigned shift), then <code>CMP #$08 / ORA #%11110000</code> (sign extension).</p>
     <h3>The comparison problem</h3>
-    <p>The 6502's <code>CMP</code> instruction subtracts without storing the result, then sets flags exactly the way <code>SBC</code> would. <code>BCC</code>/<code>BCS</code> (branching on the carry flag) give you a correct <strong>unsigned</strong> less-than/greater-or-equal test - this is what most SMB code uses.</p>
+    <p>The 6502's <code>CMP</code> instruction subtracts without storing the result, then sets flags exactly the way <code>SBC</code> would. <code>BCC</code>/<code>BCS</code> (branching on the carry flag) give you a correct <strong>unsigned</strong> less-than/greater-or-equal test - this is what most NES game code uses, and it is what magnitude comparisons rely on throughout a typical platformer.</p>
     <p><code>BMI</code>/<code>BPL</code> (branching on the sign bit of the result) look like they should give you a <strong>signed</strong> comparison, and most of the time they do. But they are only correct when the underlying subtraction does not itself overflow the signed range - that is, when the overflow flag (<code>V</code>) is clear. If it is set, the sign bit of the result is lying about the true relationship between the two operands.</p>
     <p>Concretely: compare <code>$7F</code> (+127) to <code>$80</code> (-128) using <code>CMP $80</code> then <code>BMI</code>. The subtraction <code>$7F - $80</code> computes as <code>$FF</code> in two's complement - bit 7 is set, so <code>BMI</code> alone says "the first operand is smaller." But +127 is <em>obviously</em> greater than -128. The comparison is wrong, because the subtraction overflowed the signed range and nobody checked <code>V</code>.</p>
     <p>The lesson for a port: do not translate "the ROM used <code>BMI</code> here" into "use <code>&lt;</code> naively" without checking whether your language's native signed comparison operator does the right thing. In Go, Rust, C, and Java, the native <code>&lt;</code>/<code>&gt;</code> operators on a signed integer type (<code>int8</code>, <code>i8</code>, etc.) are <strong>always correct</strong> for the full range of that type - they do not have the 6502's overflow-flag pitfall, because the CPU computes the comparison with wider internal arithmetic than 8 bits. This means a modern-language port is <em>safer</em> here than a literal translation of the 6502 branch sequence would be, as long as you compare using the language's signed type and not a raw byte pattern.</p>
@@ -583,7 +583,7 @@ if accumulator &lt; old {  // unsigned overflow occurred
 }</code></pre>
     <p><strong>Preserve carry between chained adds.</strong> The #1 arithmetic bug in 6502 programming is accidentally clearing the carry between the low-byte and high-byte additions of a multi-byte operation. The same applies in your port: when adding fractional byte, then integer byte, then page byte, the carry from each stage must feed into the next. Do not reset <code>carry = 0</code> between them - exactly what the "chaining ADC" exercise above demonstrates.</p>
     <p><strong>Sign-extend after unsigned split.</strong> Always cast to unsigned before bit manipulation. Apply sign extension afterward based on the original sign. Never right-shift a signed value when you need raw bit patterns.</p>
-    <p><strong>Clamp, do not modulo.</strong> SMB speed limits are enforced by comparison and clamping (<code>CMP</code> + <code>BCC/BCS</code>), not by modular arithmetic. When speed exceeds the table maximum, it is set to the maximum, not wrapped.</p>
+    <p><strong>Clamp, do not modulo.</strong> NES speed limits are typically enforced by comparison and clamping (<code>CMP</code> + <code>BCC/BCS</code>), not by modular arithmetic. When speed exceeds the table maximum, it is set to the maximum, not wrapped.</p>
     <p><strong>Do not use float "for simplicity."</strong> Modern CPUs have fast FPUs, so float seems free. But float introduces three problems that NES integer math avoids:</p>
     <ol>
       <li><strong>Non-determinism across platforms.</strong> Go's <code>float64</code> may give different results on ARM vs x86 due to FMA instruction fusion and intermediate precision differences. Integer math is identical everywhere.</li>
@@ -593,12 +593,12 @@ if accumulator &lt; old {  // unsigned overflow occurred
     <p><strong>Design with fixed-point from the start.</strong> One NES developer who retrofitted fixed-point into an existing integer-only codebase reported it took far longer than building with it from day one. Use integer types for position and speed from the first line of physics code. The conversion from float is not mechanical; it changes overflow behavior, comparison semantics, and accumulator patterns throughout the codebase.</p>
     <p><strong>Respect the determinism.</strong> Identical inputs must produce identical outputs on every run. This is the property that makes NES speedrunning possible and that players subconsciously rely on for consistent game feel.</p>
     <h3>Not every port needs the full stack</h3>
-    <p>Everything above is SMB's specific choice, not the NES's only choice. Plenty of NES games get by with a single signed velocity byte added directly into the fractional half of a 16-bit position, with no separate speed/accumulator split at all - or with no fractional component whatsoever, just a fixed whole number of pixels moved every frame. Both degrade to a single carry-chained add with nothing above it.</p>
+    <p>Everything above is one game's specific choice, not the NES's only choice. Plenty of NES games get by with a single signed velocity byte added directly into the fractional half of a 16-bit position, with no separate speed/accumulator split at all - or with no fractional component whatsoever, just a fixed whole number of pixels moved every frame. Both degrade to a single carry-chained add with nothing above it.</p>
   </section>
 
   <section class="exercise" id="exercise-simple-movement">
     <h2>Try it: position alone, no Q4.4</h2>
-    <p>Not every NES game needs Super Mario Bros.' specific sub-pixel scheme. Some objects - a bullet, a simple enemy drifting one direction - just move a fixed whole number of pixels every frame, with carry-in always 0 and no accumulator feeding it. This is the same page/pixel carry-chain used everywhere else on this page, used completely on its own.</p>
+    <p>Not every NES game needs a specific sub-pixel scheme like the one above. Some objects - a bullet, a simple enemy drifting one direction - just move a fixed whole number of pixels every frame, with carry-in always 0 and no accumulator feeding it. This is the same page/pixel carry-chain used everywhere else on this page, used completely on its own.</p>
     <div class="controls">
       <label>velocity (px/frame) <input type="number" id="simple-velocity" min="-128" max="127" value="4"></label>
       <label>start pixel <input type="number" id="simple-pixel" min="0" max="255" value="250"></label>
@@ -617,7 +617,7 @@ if accumulator &lt; old {  // unsigned overflow occurred
     <p>Before writing physics code, build a small set of types that model the 6502's hardware roles. The guiding principle: <strong>model hardware roles, not decimal values.</strong></p>
     <h3>Types by role</h3>
     <pre><code>type Q4_4 uint8         // speed bytes - 4-bit integer + 4-bit fraction
-type Accumulator8 uint8 // carry-producing residue buckets (MoveForce, YMFDummy)
+type Accumulator8 uint8 // carry-producing residue buckets (MoveForce, delay accumulators)
 type Carry uint8        // 0 or 1, models the 6502 carry flag
 
 type Position16 struct {
@@ -640,20 +640,20 @@ page, _         = ADC(page, signExtend(whole), carry) // page + carry from pixel
     <p>Horizontal and vertical motion use different chain depths, so model them separately:</p>
     <pre><code>type HorizontalMotion struct {
     Position  Position16
-    MoveForce Accumulator8 // SMB: SprObject_X_MoveForce ($0400)
-    Speed     Q4_4         // SMB: SprObject_X_Speed ($0057)
+    MoveForce Accumulator8 // horizontal sub-pixel accumulator
+    Speed     Q4_4         // horizontal speed byte
 }
 
 type VerticalMotion struct {
     Position  Position16
-    MoveForce Accumulator8 // SMB: SprObject_Y_MoveForce ($0433)
-    Dummy     Accumulator8 // SMB: SprObject_YMF_Dummy ($0416)
-    Speed     int8         // SMB: SprObject_Y_Speed ($009F) - raw signed byte, NOT Q4_4
-    HighPos   uint8        // SMB: SprObject_Y_HighPos - off-screen detection
+    MoveForce Accumulator8 // vertical force accumulator
+    Dummy     Accumulator8 // delayed copy of MoveForce, for the position chain
+    Speed     int8         // raw signed byte, NOT Q4_4
+    HighPos   uint8        // off-screen detection
 }</code></pre>
     <p><strong>Vertical speed is <code>int8</code>, not <code>Q4_4</code></strong> (see <a href="#sec-5b">"vertical speed is not 4.4"</a>). The vertical carry chain is structurally different from horizontal - <code>MoveForce</code> accumulates the gravity force and its overflow promotes <code>Speed</code> by one whole unit; <code>Dummy</code> accumulates <code>MoveForce</code>'s old (pre-update) value and its carry feeds into the position addition alongside <code>Speed</code>'s raw byte; <code>Speed</code> is added directly to position with no nybble split.</p>
     <h3>What these primitives are not</h3>
-    <p>They are not a math library. You cannot multiply two <code>Q4_4</code> values - SMB never does. You cannot convert a <code>float64</code> to <code>Q4_4</code> - the constructor takes a <code>uint8</code> because the NES works in bytes. There is no <code>String()</code> method that prints "1.5625" - the decimal representation is a human convenience, not something the game computes.</p>
+    <p>They are not a math library. You cannot multiply two <code>Q4_4</code> values - a typical NES platformer never does. You cannot convert a <code>float64</code> to <code>Q4_4</code> - the constructor takes a <code>uint8</code> because the NES works in bytes. There is no <code>String()</code> method that prints "1.5625" - the decimal representation is a human convenience, not something the game computes.</p>
     <p>These types exist to make 6502 arithmetic patterns expressible in Go without manual bit manipulation at every call site. They turn the carry-chain algorithm from section 1 into callable code - and the capstone below is that code, fully assembled.</p>
   </section>
 
@@ -672,7 +672,7 @@ type VerticalMotion struct {
       <canvas id="capstone-canvas" width="640" height="260"></canvas>
       <p id="capstone-result" class="result-line">&nbsp;</p>
     </div>
-    <p class="hint">This is the shape of a Mario jump: rising, arcing over, falling - produced entirely by integer carry chains, no floating point anywhere.</p>
+    <p class="hint">This is the shape of a classic platformer jump: rising, arcing over, falling - produced entirely by integer carry chains, no floating point anywhere.</p>
   </section>
 
 </main>

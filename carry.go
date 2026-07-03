@@ -27,7 +27,8 @@ type Carry uint8
 // Passing c as 0 corresponds to executing CLC before ADC. Passing c as 1
 // (typically the carry returned by a previous ADC or SBC call) corresponds
 // to chaining additions across multiple bytes without an intervening CLC,
-// exactly as SMBDIS.ASM does for multi-byte position and force updates.
+// exactly as real NES code does for multi-byte position and force
+// updates.
 //
 // ADC does not distinguish signed from unsigned interpretation of a or b,
 // matching the 6502: the bit pattern and the carry behavior are identical
@@ -45,8 +46,8 @@ func ADC(a *uint8, b uint8, c Carry) Carry {
 // This is the single most counterintuitive part of 6502 arithmetic: unlike
 // most modern subtract-with-borrow semantics, carry=1 is the "good" state
 // (no borrow needed), and it is what SEC (set carry) before a subtraction
-// chain establishes. SMBDIS.ASM's ImposeFriction and similar routines rely
-// on this convention when subtracting across chained bytes.
+// chain establishes. Friction routines and similar code in real NES games
+// rely on this convention when subtracting across chained bytes.
 //
 // SBC is implemented the same way the 6502 hardware implements it
 // internally: as an ADC of the bitwise complement of b. This is not a

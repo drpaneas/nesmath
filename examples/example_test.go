@@ -28,8 +28,8 @@ func ExampleADC() {
 
 // Example_q44Split demonstrates splitting a signed 4.4 speed byte
 // ([nesmath.Q4_4]) into its whole-pixel and fractional components. 0x19
-// is Super Mario Bros.' observed run speed, 1.5625 pixels/frame: a whole
-// part of 1 pixel, and a fraction of 0x90 (144/256 = 9/16) that
+// is a classic platformer's observed run speed, 1.5625 pixels/frame: a
+// whole part of 1 pixel, and a fraction of 0x90 (144/256 = 9/16) that
 // accumulates toward a second pixel of movement roughly every other
 // frame.
 //
@@ -75,7 +75,7 @@ func ExampleVerticalMotion_Step() {
 
 // ExamplePosition16_AddSigned demonstrates that nesmath does not require
 // [nesmath.Q4_4] or [nesmath.Accumulator8] at all for games (or objects)
-// that do not need Super Mario Bros.' specific sub-pixel scheme. Many NES
+// that do not need this specific sub-pixel scheme. Many NES
 // games move objects by a fixed whole number of pixels per frame with no
 // fractional component whatsoever, or add a raw signed velocity byte
 // directly into a position - both cases are just repeated calls to
@@ -102,7 +102,7 @@ func ExamplePosition16_AddSigned() {
 }
 
 // ExampleHorizontalMotion_Step demonstrates the full carry pipeline over
-// four frames at Mario's run speed (0x19). The pixel movement alternates
+// four frames at a classic run speed (0x19). The pixel movement alternates
 // 1, 2, 1, 2 - not a rounding bug, but the deterministic result of the
 // sub-pixel accumulator (0x90 = 9/16 scaled to /256) overflowing every
 // other frame. The long-run average, (1+2)/2 = 1.5, converges to the true

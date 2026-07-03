@@ -9,8 +9,8 @@ package nesmath
 // just been shifted right 4 times (LSR ×4), which always leaves zeros in
 // the upper nybble.
 //
-// It mirrors the sign-extension idiom in MoveObjectHorizontally
-// (SMBDIS.ASM:7548-7551):
+// It mirrors the sign-extension idiom in a typical horizontal-movement
+// routine:
 //
 //	cmp #$08
 //	bcc SaveXSpd
@@ -29,8 +29,8 @@ func SignExtend4to8(nybble uint8) int8 {
 
 // Negate returns the two's complement negation of v.
 //
-// It mirrors the standard 6502 negation idiom used throughout SMBDIS.ASM
-// for absolute value and direction reversal (e.g. line 8473):
+// It mirrors the standard 6502 negation idiom used throughout NES game
+// code for absolute value and direction reversal:
 //
 //	eor #$ff
 //	clc
@@ -49,7 +49,7 @@ func Negate(v uint8) uint8 {
 // shifted out of high's bit 7 is discarded.
 //
 // It mirrors the ASL/ROL pair the 6502 uses to shift a two-byte quantity,
-// such as the friction-doubling code during a skid:
+// such as friction-doubling code during a skid:
 //
 //	asl FrictionAdderLow
 //	rol FrictionAdderHigh

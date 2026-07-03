@@ -6,18 +6,19 @@ package nesmath
 // models a hardware role (an accumulator, a carry, a page/pixel pair)
 // rather than a number.
 //
-// Q4_4 backs SMBDIS.ASM's SprObject_X_Speed and SprObject_Y_Speed. Its
-// value is best understood not as "integer + fraction/16" computed
-// independently, but as the whole byte reinterpreted as a signed 8-bit
-// integer and divided by 16 - [Split] produces the same result either
-// way, because that is how the nybble-split algorithm and two's
-// complement scaling agree by construction.
+// Q4_4 backs the horizontal and vertical speed bytes used by classic NES
+// platformers. Its value is best understood not as "integer +
+// fraction/16" computed independently, but as the whole byte
+// reinterpreted as a signed 8-bit integer and divided by 16 - [Split]
+// produces the same result either way, because that is how the
+// nybble-split algorithm and two's complement scaling agree by
+// construction.
 //
-// Q4_4 intentionally has no +, -, *, or / operations. SMB never adds two
-// speed values directly - speed changes come from the friction and
-// gravity systems operating on raw bytes through [ADC]/[SBC], not from
-// combining two Q4_4 values. Providing arithmetic here would invite code
-// that no NES game actually contains.
+// Q4_4 intentionally has no +, -, *, or / operations. A typical NES
+// platformer never adds two speed values directly - speed changes come
+// from the friction and gravity systems operating on raw bytes through
+// [ADC]/[SBC], not from combining two Q4_4 values. Providing arithmetic
+// here would invite code that no NES game actually contains.
 type Q4_4 uint8
 
 // Split divides s into its whole-pixel and fractional components.
@@ -27,16 +28,16 @@ type Q4_4 uint8
 // directly to an 8-bit sub-pixel accumulator. whole is the high nybble of
 // s, sign-extended via [SignExtend4to8].
 //
-// This mirrors MoveObjectHorizontally (SMBDIS.ASM:7541-7556) exactly:
+// This mirrors a typical horizontal-movement routine exactly:
 //
-//	lda SprObject_X_Speed,x
+//	lda XSpeed,x
 //	asl
 //	asl
 //	asl
 //	asl                  ; frac = low nybble << 4
 //	sta $01
 //
-//	lda SprObject_X_Speed,x
+//	lda XSpeed,x
 //	lsr
 //	lsr
 //	lsr
@@ -63,8 +64,8 @@ func (s Q4_4) Split() (whole int8, frac uint8) {
 }
 
 // IsNegative reports whether s represents a negative speed, i.e. whether
-// bit 7 of the raw byte is set. It mirrors the CMP #$00 / BPL idiom used
-// throughout SMBDIS.ASM to branch on a speed's direction.
+// bit 7 of the raw byte is set. It mirrors the CMP #$00 / BPL idiom
+// commonly used in NES game code to branch on a speed's direction.
 func (s Q4_4) IsNegative() bool {
 	return uint8(s)&0x80 != 0
 }
@@ -72,10 +73,9 @@ func (s Q4_4) IsNegative() bool {
 // Abs returns the unsigned magnitude of s as a raw byte, computed by
 // negating the whole byte via two's complement if it is negative.
 //
-// It mirrors the Player_XSpeedAbsolute computation (SMBDIS.ASM:6260),
-// which SMB uses to index speed-tier tables and compare against
-// thresholds like the run-speed and skid-snap constants regardless of
-// direction of travel.
+// It mirrors the absolute-speed helper many NES platformers use to index
+// speed-tier tables and compare against thresholds like the run-speed
+// and skid-snap constants regardless of direction of travel.
 func (s Q4_4) Abs() uint8 {
 	raw := uint8(s)
 	if raw&0x80 != 0 {
@@ -87,9 +87,9 @@ func (s Q4_4) Abs() uint8 {
 // Negate returns the two's complement negation of s as a Q4_4, reversing
 // its direction while preserving its magnitude.
 //
-// It mirrors the direction-reversal idiom used for bouncing/turning
-// objects such as the Fire Bar and Cheep-Cheep handlers (e.g.
-// SMBDIS.ASM:8473):
+// It mirrors the direction-reversal idiom commonly used for
+// bouncing/turning objects such as rotating hazards and swimming
+// enemies:
 //
 //	eor #$ff
 //	clc
@@ -112,13 +112,13 @@ func (s Q4_4) Negate() Q4_4 {
 // valid signed less-than/greater-than test when the implicit subtraction
 // does not itself signed-overflow (V=0). A true signed comparison needs
 // BMI/BPL combined with a check of the V flag (e.g. an EOR of N and V, a
-// pattern most 6502 references gloss over), and SMB's own code sidesteps
-// this by using BCC/BCS/BEQ only in places where it already knows both
-// operands share a narrow, consistent range where the unsigned and
-// signed orderings coincide. Cmp's Go implementation has no such
-// restriction - it is correct for the full int8 range - which is why it
-// is described here as "a signed comparison," not as a stand-in for any
-// specific 6502 branch idiom.
+// pattern most 6502 references gloss over), and most real NES game code
+// sidesteps this by using BCC/BCS/BEQ only in places where it already
+// knows both operands share a narrow, consistent range where the
+// unsigned and signed orderings coincide. Cmp's Go implementation has no
+// such restriction - it is correct for the full int8 range - which is
+// why it is described here as "a signed comparison," not as a stand-in
+// for any specific 6502 branch idiom.
 func (s Q4_4) Cmp(other Q4_4) int {
 	a := int8(uint8(s))
 	b := int8(uint8(other))

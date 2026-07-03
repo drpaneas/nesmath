@@ -3,11 +3,11 @@ package nesmath
 import "testing"
 
 // TestQ4_4_Split covers the full matrix of named horizontal speed values
-// from the design spec. All of these are SprObject_X_Speed values, split
-// by MoveObjectHorizontally exactly as Split implements.
+// from the design spec. All of these are horizontal speed values, split
+// by a typical horizontal-movement routine exactly as Split implements.
 //
-// Note on the $FC case: some secondary write-ups describe SMB's initial
-// standing-jump velocity ($FC) as "-4.0 pixels/frame" by reading
+// Note on the $FC case: some secondary write-ups describe a game's
+// initial standing-jump velocity ($FC) as "-4.0 pixels/frame" by reading
 // int8(0xFC) directly as a whole-pixel count. That skips the /16 scaling
 // that Q4_4 always applies. The correct nybble split of 0xFC (1111 1100)
 // is whole=-1 (high nybble 0xF sign-extended), frac=0xC0 (low nybble 0xC
@@ -15,16 +15,16 @@ import "testing"
 // which matches int8(0xFC)/16 = -4/16 = -0.25 exactly.
 //
 // This $FC value is included here only as a Split() math exercise, not as
-// a claim about real game behavior: $FC is actually a PlayerYSpdData
-// vertical speed, and vertical speed is never nybble-split at all (see
+// a claim about real game behavior: $FC is actually a raw vertical jump
+// speed, and vertical speed is never nybble-split at all (see
 // [VerticalMotion] and NES_MATH_FOR_PORTERS.md's "Vertical speed is not
-// 4.4" section) - ImposeGravity adds it to Y_Position as a raw signed
+// 4.4" section) - a gravity routine adds it to YPosition as a raw signed
 // whole byte, so the real in-game value of $FC is -4.0, not -0.25. For
-// the same reason, PlayerYSpdData's swimming entries ($FE, $FB, ...) are
+// the same reason, other swimming-jump entries ($FE, $FB, ...) are
 // intentionally not tested here: applying Split() to them would imply
-// they are meant to be nybble-split, which they are not. The Goomba
-// entry below is genuine, though - enemy horizontal speed uses the same
-// Q4_4 format as the player's.
+// they are meant to be nybble-split, which they are not. The common
+// ground-enemy entry below is genuine, though - enemy horizontal speed
+// uses the same Q4_4 format as the player's.
 func TestQ4_4_Split(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -40,7 +40,7 @@ func TestQ4_4_Split(t *testing.T) {
 		{"maximum negative -8.0", 0x80, -8, 0x00},
 		{"maximum positive 7.9375", 0x7F, 7, 0xF0},
 		{"0xFC as a Split() math exercise only, not real vertical behavior", 0xFC, -1, 0xC0},
-		{"goomba speed 0.75 (most common enemy speed, genuine horizontal Q4_4)", 0x0C, 0, 0xC0},
+		{"common ground-enemy speed 0.75 (genuine horizontal Q4_4)", 0x0C, 0, 0xC0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

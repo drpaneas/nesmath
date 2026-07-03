@@ -49,10 +49,11 @@ func TestNegate(t *testing.T) {
 }
 
 // TestASL16_FrictionDoubling reproduces the exact friction-doubling
-// values SMB uses during a skid reversal: FrictionData entries are
-// doubled via ASL/ROL before being applied, and these two results
-// (0x01A0 for walking, 0x01C8 for running) are the specific 16-bit values
-// cited in the wiki's friction-doubling section.
+// values a typical NES platformer uses during a skid reversal: friction
+// table entries are doubled via ASL/ROL before being applied, and these
+// two results (0x01A0 for walking, 0x01C8 for running) are the specific
+// 16-bit values commonly documented for this kind of friction-doubling
+// step.
 func TestASL16_FrictionDoubling(t *testing.T) {
 	tests := []struct {
 		name         string
