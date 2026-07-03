@@ -86,7 +86,7 @@ main {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 1.5rem 1.75rem;
-  margin-bottom: 2rem;
+  margin-bottom: 2.5rem;
 }
 
 .exercise h2 {
@@ -95,15 +95,95 @@ main {
   font-size: 1.15rem;
 }
 
+.exercise h2::before {
+  content: "\25B8 ";
+  color: var(--accent);
+}
+
 .exercise p {
   color: var(--text-dim);
 }
 
-.exercise code {
+.exercise code,
+.prose code {
   color: var(--warn);
   background: rgba(255, 255, 255, 0.06);
   padding: 0.1rem 0.35rem;
   border-radius: 3px;
+}
+
+.prose {
+  margin-bottom: 2.5rem;
+}
+
+.prose h2 {
+  color: var(--text);
+  font-size: 1.5rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.6rem;
+  margin: 0 0 1.25rem;
+}
+
+.prose h3 {
+  color: var(--accent-2);
+  font-size: 1.05rem;
+  margin: 1.75rem 0 0.75rem;
+}
+
+.prose p {
+  margin: 0 0 1rem;
+}
+
+.prose ul,
+.prose ol {
+  padding-left: 1.4rem;
+  margin: 0 0 1rem;
+}
+
+.prose li {
+  margin-bottom: 0.6rem;
+}
+
+.prose a {
+  color: var(--accent-2);
+}
+
+.prose pre {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem 1.1rem;
+  margin: 0 0 1rem;
+  overflow-x: auto;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.prose pre code {
+  background: none;
+  color: var(--text);
+  padding: 0;
+  border-radius: 0;
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 1.25rem;
+  font-size: 0.88rem;
+}
+
+.prose th,
+.prose td {
+  border: 1px solid var(--border);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.prose th {
+  background: var(--bg-panel);
+  color: var(--text-dim);
+  font-weight: normal;
 }
 
 .controls {
