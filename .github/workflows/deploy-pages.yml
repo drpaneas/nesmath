@@ -34,10 +34,7 @@ jobs:
           go-version-file: go.mod
 
       - name: Build nesmath.wasm and copy the Go runtime's JS glue
-        run: |
-          cd web
-          GOOS=js GOARCH=wasm go build -o static/nesmath.wasm ./wasm
-          cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" static/wasm_exec.js
+        run: web/build.sh
 
       - name: Upload static site as a Pages artifact
         uses: actions/upload-pages-artifact@v5
