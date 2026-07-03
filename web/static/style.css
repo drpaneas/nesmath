@@ -6,7 +6,6 @@
   --text-dim: #9494ab;
   --accent: #ef4a5c;
   --accent-2: #4ac0ef;
-  --ok: #5fd68a;
   --warn: #f2c14e;
   --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 }
@@ -43,24 +42,31 @@ h1 {
   margin: 0 auto;
 }
 
+.links {
+  margin: 0.75rem 0 0;
+  font-size: 0.85rem;
+}
+
+.links a {
+  color: var(--accent-2);
+  text-decoration: none;
+}
+
+.links a:hover {
+  text-decoration: underline;
+}
+
+.links span {
+  color: var(--border);
+  margin: 0 0.5rem;
+}
+
 .status {
   display: inline-block;
   margin-top: 1rem;
   padding: 0.35rem 0.9rem;
   border-radius: 4px;
   font-size: 0.85rem;
-}
-
-.status.loading {
-  background: rgba(242, 193, 78, 0.15);
-  color: var(--warn);
-  border: 1px solid var(--warn);
-}
-
-.status.ready {
-  background: rgba(95, 214, 138, 0.15);
-  color: var(--ok);
-  border: 1px solid var(--ok);
 }
 
 .status.error {
@@ -169,8 +175,9 @@ canvas {
 .bit-grid,
 .nybble-grid {
   display: flex;
-  gap: 1.5rem;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
   margin-bottom: 0.75rem;
 }
 

@@ -10,8 +10,15 @@
 
 <header>
   <h1>nesmath</h1>
-  <p class="tagline">The 6502 carry-chain architecture behind Super Mario Bros, running live in your browser via WebAssembly - no build step, no server-side code, just the real Go library compiled to WASM.</p>
-  <p id="wasm-status" class="status loading">Loading nesmath.wasm...</p>
+  <p class="tagline">The 6502 carry-chain architecture behind Super Mario Bros, running live in your browser via WebAssembly.</p>
+  <p class="links">
+    <a href="https://github.com/drpaneas/nesmath" target="_blank" rel="noopener">GitHub</a>
+    <span aria-hidden="true">&middot;</span>
+    <a href="https://pkg.go.dev/github.com/drpaneas/nesmath" target="_blank" rel="noopener">Docs</a>
+    <span aria-hidden="true">&middot;</span>
+    <a href="https://github.com/drpaneas/nesmath/blob/main/NES_MATH_FOR_PORTERS.md" target="_blank" rel="noopener">Article</a>
+  </p>
+  <p id="wasm-status" class="status" hidden></p>
 </header>
 
 <main>
@@ -180,7 +187,7 @@
 </main>
 
 <footer>
-  <p>Every function above calls the real <a href="https://github.com/drpaneas/nesmath" target="_blank" rel="noopener">nesmath</a> Go library, compiled to WebAssembly with the standard Go toolchain - nothing here is reimplemented in JavaScript. See <code>NES_MATH_FOR_PORTERS.md</code> for the full conceptual background.</p>
+  <p>Every function above calls the real <a href="https://github.com/drpaneas/nesmath" target="_blank" rel="noopener">nesmath</a> Go library, compiled to WebAssembly with the standard Go toolchain - nothing here is reimplemented in JavaScript. See <a href="https://github.com/drpaneas/nesmath/blob/main/NES_MATH_FOR_PORTERS.md" target="_blank" rel="noopener"><code>NES_MATH_FOR_PORTERS.md</code></a> for the full conceptual background, or the <a href="https://pkg.go.dev/github.com/drpaneas/nesmath" target="_blank" rel="noopener">package documentation</a> for the API reference.</p>
 </footer>
 
 <script src="wasm_exec.js"></script>

@@ -11,14 +11,15 @@ const go = new Go();
 
 function onWasmReady(result) {
   go.run(result.instance);
-  statusEl.textContent = "nesmath.wasm loaded - all exercises are live.";
-  statusEl.className = "status ready";
   buttons().forEach((b) => (b.disabled = false));
 }
 
+// No visible banner on success - only surfaced if loading genuinely fails,
+// so users aren't left with silently-disabled buttons and no explanation.
 function onWasmError(err) {
   statusEl.textContent = "Failed to load nesmath.wasm: " + err;
   statusEl.className = "status error";
+  statusEl.hidden = false;
 }
 
 // instantiateStreaming requires the server to send Content-Type:

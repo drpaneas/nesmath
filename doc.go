@@ -43,7 +43,7 @@
 // Every type and method in this package documents the SMBDIS.ASM routine
 // it mirrors. The full conceptual background - why fixed-point instead of
 // float, the history of the 4.4 and 8.8 formats, and a worked frame-by-frame
-// trace of the carry chain - is in NES_MATH_FOR_PORTERS.md in this repo.
+// trace of the carry chain - is in [NES_MATH_FOR_PORTERS.md] in this repo.
 //
 // # What this package does not do
 //
@@ -87,4 +87,6 @@
 // them frame-for-frame against this package - is a natural extension for
 // callers building a full port, but is intentionally left out of this
 // package to keep it dependency-free.
+//
+// [NES_MATH_FOR_PORTERS.md]: https://github.com/drpaneas/nesmath/blob/main/NES_MATH_FOR_PORTERS.md
 package nesmath
