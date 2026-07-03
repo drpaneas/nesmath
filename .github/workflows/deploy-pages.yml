@@ -1,0 +1,56 @@
+name: Deploy interactive exercises to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "*.go"
+      - "go.mod"
+      - ".github/workflows/deploy-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one deployment at a time; let in-flight runs finish rather than
+# cancelling them mid-deploy.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build nesmath.wasm and copy the Go runtime's JS glue
+        run: |
+          cd web
+          GOOS=js GOARCH=wasm go build -o static/nesmath.wasm ./wasm
+          cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" static/wasm_exec.js
+
+      - name: Upload static site as a Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: web/static
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

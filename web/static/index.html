@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>nesmath - Interactive Exercises</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <h1>nesmath</h1>
+  <p class="tagline">The 6502 carry-chain architecture behind Super Mario Bros, running live in your browser via WebAssembly - no build step, no server-side code, just the real Go library compiled to WASM.</p>
+  <p id="wasm-status" class="status loading">Loading nesmath.wasm...</p>
+</header>
+
+<main>
+
+  <section class="exercise" id="exercise-adc">
+    <h2>1. ADC: add-with-carry</h2>
+    <p>The single primitive everything else in this library builds on. Pick two bytes and an incoming carry, and watch the 6502's <code>ADC</code> instruction do its thing: add both operands <em>and</em> the carry flag in one step, wrapping at 256 and reporting whether it overflowed.</p>
+    <div class="controls">
+      <label>a <input type="number" id="adc-a" min="0" max="255" value="144"></label>
+      <label>b <input type="number" id="adc-b" min="0" max="255" value="144"></label>
+      <label>carry in <select id="adc-c"><option value="0">0</option><option value="1">1</option></select></label>
+      <button onclick="runADC()">Run ADC</button>
+    </div>
+    <div class="output">
+      <div class="bit-grid" id="adc-grid"></div>
+      <p id="adc-result" class="result-line">&nbsp;</p>
+    </div>
+    <p class="hint">Try a=144 (0x90), b=144 (0x90), carry=0. This is the exact sub-pixel overflow from Mario's run speed - see exercise 6.</p>
+  </section>
+
+  <section class="exercise" id="exercise-sbc">
+    <h2>2. SBC: subtract-with-borrow</h2>
+    <p>The 6502's <code>SBC</code> instruction has one famously counterintuitive rule: the carry flag means the <strong>opposite</strong> of what you'd guess. <code>carry=1</code> means no borrow happened; <code>carry=0</code> means a borrow occurred. Try 5-3 with carry=1 first (clean subtraction), then 3-5 with carry=1 (watch it borrow).</p>
+    <div class="controls">
+      <label>a <input type="number" id="sbc-a" min="0" max="255" value="5"></label>
+      <label>b <input type="number" id="sbc-b" min="0" max="255" value="3"></label>
+      <label>carry in <select id="sbc-c"><option value="1">1</option><option value="0">0</option></select></label>
+      <button onclick="runSBC()">Run SBC</button>
+    </div>
+    <div class="output">
+      <div class="bit-grid" id="sbc-grid"></div>
+      <p id="sbc-result" class="result-line">&nbsp;</p>
+    </div>
+    <p class="hint">Try a=3, b=5, carry=1: a is less than b, so this borrows - carry out becomes 0, not 1.</p>
+  </section>
+
+  <section class="exercise" id="exercise-chain16">
+    <h2>3. Chaining ADC across two bytes</h2>
+    <p>The 6502 has no 16-bit registers, so a 16-bit add is two 8-bit <code>ADC</code> calls: add the low bytes first, then add the high bytes <strong>using the carry the low-byte addition produced</strong> - no <code>CLC</code> in between. This is the raw mechanism behind every multi-byte operation in this library, including <code>Position16.AddSigned</code>.</p>
+    <div class="controls">
+      <label>a low <input type="number" id="chain-alow" min="0" max="255" value="255"></label>
+      <label>a high <input type="number" id="chain-ahigh" min="0" max="255" value="0"></label>
+      <label>b low <input type="number" id="chain-blow" min="0" max="255" value="1"></label>
+      <label>b high <input type="number" id="chain-bhigh" min="0" max="255" value="0"></label>
+      <button onclick="runChainedAdd16()">Run</button>
+    </div>
+    <div class="output">
+      <div class="bit-grid" id="chain-grid"></div>
+      <p id="chain-result" class="result-line">&nbsp;</p>
+    </div>
+    <p class="hint">Try a=255 (low=255,high=0) + b=1 (low=1,high=0): the low byte overflows to 0 with carry=1, and that carry becomes the +1 that increments the high byte - producing 256, correctly, with two 8-bit additions.</p>
+  </section>
+
+  <section class="exercise" id="exercise-negate">
+    <h2>4. Two's complement: Negate</h2>
+    <p>To negate a byte on the 6502: invert every bit, then add 1. Enter a byte and watch both steps. Try 0x80 - the most negative signed byte, -128 - and see it negate back to itself, because there is no +128 to represent in a signed byte.</p>
+    <div class="controls">
+      <label>v <input type="number" id="negate-v" min="0" max="255" value="40"></label>
+      <button onclick="runNegate()">Negate</button>
+    </div>
+    <div class="output">
+      <div class="bit-grid" id="negate-grid"></div>
+      <p id="negate-result" class="result-line">&nbsp;</p>
+    </div>
+    <p class="hint">40 (0x28) is Mario's max run speed, +2.5 px/frame. Negate it and get 0xD8, -2.5 px/frame (running left). Then try 128 (0x80) for the wrap-to-itself edge case.</p>
+  </section>
+
+  <section class="exercise" id="exercise-split">
+    <h2>5. Q4_4: splitting a speed byte</h2>
+    <p>SMB's horizontal speed is one byte: the high nybble is whole pixels, the low nybble is a fraction. Enter any byte and see the nybble split - including the $FC trap that fooled an earlier draft of this very library's own article (it's <strong>not</strong> -4.0 - see the hint).</p>
+    <div class="controls">
+      <label>speed byte (hex) <input type="text" id="split-hex" value="19" maxlength="2"></label>
+      <button onclick="runSplit()">Split</button>
+    </div>
+    <div class="output">
+      <div class="nybble-grid" id="split-grid"></div>
+      <p id="split-result" class="result-line">&nbsp;</p>
+    </div>
+    <p class="hint">Try 19 (Mario's run speed, 1.5625 px/frame), then FC (a vertical jump velocity that is NOT meant to be split like this at all - see the article's "Vertical speed is not 4.4").</p>
+  </section>
+
+  <section class="exercise" id="exercise-accumulator">
+    <h2>6. The sub-pixel accumulator: why movement alternates 1, 2, 1, 2</h2>
+    <p>An accumulator is not a number - it is a bucket that fills up and occasionally overflows. Pick a fractional value and watch it accumulate frame by frame. The bar chart shows the carry: red bars are the frames where a whole extra pixel got promoted.</p>
+    <div class="controls">
+      <label>value added each frame <input type="number" id="acc-value" min="0" max="255" value="144"></label>
+      <label>frames <input type="number" id="acc-frames" min="1" max="64" value="16"></label>
+      <button onclick="runAccumulatorTrace()">Run</button>
+    </div>
+    <div class="output">
+      <canvas id="acc-canvas" width="640" height="140"></canvas>
+      <p id="acc-result" class="result-line">&nbsp;</p>
+    </div>
+    <p class="hint">144 (0x90 = 9/16 scaled to /256) overflows every other frame at first - but run 16 frames and count the carries. It is not exactly 8. Why?</p>
+  </section>
+
+  <section class="exercise" id="exercise-simple-movement">
+    <h2>7. Position16 alone: movement without Q4_4</h2>
+    <p>Not every NES game needs Super Mario Bros.' specific sub-pixel scheme. Some objects - a bullet, a simple enemy drifting one direction - just move a fixed whole number of pixels every frame, with carryIn always 0 and no accumulator feeding it. This is <code>Position16.AddSigned</code> used completely on its own.</p>
+    <div class="controls">
+      <label>velocity (px/frame) <input type="number" id="simple-velocity" min="-128" max="127" value="4"></label>
+      <label>start pixel <input type="number" id="simple-pixel" min="0" max="255" value="250"></label>
+      <label>frames <input type="number" id="simple-frames" min="1" max="64" value="6"></label>
+      <button onclick="runSimpleMovement()">Run</button>
+    </div>
+    <div class="output">
+      <canvas id="simple-canvas" width="640" height="100"></canvas>
+      <p id="simple-result" class="result-line">&nbsp;</p>
+    </div>
+    <p class="hint">Compare this to exercise 8 (Horizontal motion): same page-crossing carry mechanism, but no Q4_4 split and no sub-pixel accumulator - just a raw integer step.</p>
+  </section>
+
+  <section class="exercise" id="exercise-horizontal">
+    <h2>8. Horizontal motion: speed becomes movement</h2>
+    <p>Combine a Q4_4 speed with the sub-pixel accumulator and a page/pixel position, and you get SMB's actual per-frame movement routine. The dot below is the object; the vertical line marks a page boundary (pixel 255 to 0).</p>
+    <div class="controls">
+      <label>speed byte (hex) <input type="text" id="h-speed" value="19" maxlength="2"></label>
+      <label>start pixel <input type="number" id="h-pixel" min="0" max="255" value="240"></label>
+      <label>frames <input type="number" id="h-frames" min="1" max="64" value="12"></label>
+      <label>compare walk ($10) vs run ($19) <input type="checkbox" id="h-compare"></label>
+      <button onclick="runHorizontalTrace()">Run</button>
+    </div>
+    <div class="output">
+      <canvas id="h-canvas" width="640" height="160"></canvas>
+      <p id="h-result" class="result-line">&nbsp;</p>
+    </div>
+    <p class="hint">Start pixel near 255 to watch it cross a page boundary within a few frames. Check the comparison box to see walk speed never oscillate while run speed alternates 1,2,1,2.</p>
+  </section>
+
+  <section class="exercise" id="exercise-vertical">
+    <h2>9. Vertical motion: the gravity chain and the jump arc</h2>
+    <p>Vertical speed is <strong>never</strong> nybble-split - it is a raw signed byte, added directly to position. Sub-pixel precision comes from two accumulators sharing a byte across two different points in their lifecycle each frame. Simulate a jump and watch Speed climb from negative (upward) toward positive (falling) while Position traces the arc.</p>
+    <div class="controls">
+      <label>initial speed <input type="number" id="v-speed" min="-128" max="127" value="-4"></label>
+      <label>gravity force <input type="number" id="v-force" min="0" max="255" value="32"></label>
+      <label>max speed <input type="number" id="v-max" min="-128" max="127" value="4"></label>
+      <label>upward force (0 = off) <input type="number" id="v-upforce" min="0" max="255" value="0"></label>
+      <label>frames <input type="number" id="v-frames" min="1" max="128" value="40"></label>
+      <button onclick="runVerticalTrace()">Run</button>
+    </div>
+    <div class="output">
+      <canvas id="v-canvas" width="640" height="220"></canvas>
+      <p id="v-result" class="result-line">&nbsp;</p>
+    </div>
+    <p class="hint">Watch for the frame where Speed crosses from negative to non-negative - that is the peak of the jump. Set upward force > 0 to see the optional mirrored deceleration path (used by e.g. Red Koopa Paratroopa, never by the player).</p>
+  </section>
+
+  <section class="exercise" id="exercise-capstone">
+    <h2>10. Capstone: the full jump trajectory</h2>
+    <p>The finale: HorizontalMotion and VerticalMotion driven together, frame by frame, plotted as a single X-Y curve - horizontal displacement against vertical displacement, with "up" drawn upward to match the in-game convention. This is everything above, composed.</p>
+    <div class="controls">
+      <label>horizontal speed (hex) <input type="text" id="capstone-hspeed" value="19" maxlength="2"></label>
+      <label>initial vertical speed <input type="number" id="capstone-vspeed" min="-128" max="127" value="-8"></label>
+      <label>gravity force <input type="number" id="capstone-vforce" min="0" max="255" value="20"></label>
+      <label>max fall speed <input type="number" id="capstone-vmax" min="-128" max="127" value="4"></label>
+      <label>frames <input type="number" id="capstone-frames" min="1" max="128" value="50"></label>
+      <button onclick="runJumpTrajectory()">Run</button>
+    </div>
+    <div class="output">
+      <canvas id="capstone-canvas" width="640" height="260"></canvas>
+      <p id="capstone-result" class="result-line">&nbsp;</p>
+    </div>
+    <p class="hint">This is the shape of a Mario jump: rising, arcing over, falling - produced entirely by integer carry chains, no floating point anywhere.</p>
+  </section>
+
+</main>
+
+<footer>
+  <p>Every function above calls the real <a href="https://github.com/drpaneas/nesmath" target="_blank" rel="noopener">nesmath</a> Go library, compiled to WebAssembly with the standard Go toolchain - nothing here is reimplemented in JavaScript. See <code>NES_MATH_FOR_PORTERS.md</code> for the full conceptual background.</p>
+</footer>
+
+<script src="wasm_exec.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

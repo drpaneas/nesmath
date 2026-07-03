@@ -1,0 +1,8 @@
+# Build artifacts for the WebAssembly exercises - both are reproducible
+# via web/build.sh; wasm_exec.js in particular is copied from the local
+# Go toolchain and should not drift independently of it.
+web/static/nesmath.wasm
+web/static/wasm_exec.js
+
+# Brainstorming session scratch files (visual companion mockups/state)
+.superpowers/
